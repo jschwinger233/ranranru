@@ -1,0 +1,32 @@
+import bcc
+
+text = '''
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+
+struct data_t {{}};
+
+BPF_PERF_OUTPUT(events);
+
+void trace0(struct pt_regs *ctx) {{
+    struct data_t data = {{}};
+    events.perf_submit(ctx, &data, sizeof(data));
+}}
+'''
+
+b = bcc.BPF(text=text)
+b.attach_uprobe(
+    name='{pathname}',
+    sym='{uprobe}',
+    fn_name='trace0')
+
+
+def print_event(_, __, ___):
+    {script}
+
+
+print('starting')
+b["events"].open_perf_buffer(print_event)
+while 1:
+    b.perf_buffer_poll()
+
