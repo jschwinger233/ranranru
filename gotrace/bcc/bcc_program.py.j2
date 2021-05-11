@@ -1,0 +1,63 @@
+import bcc
+import ctypes
+{% for import in bcc_py_imports %}
+{{ impoort }}
+{% endfor %}
+
+text = '''
+#include <uapi/linux/ptrace.h>
+#include <linux/sched.h>
+{% for header in bcc_c_headers %}
+{{ header }}
+{% endfor %}
+
+struct data_t {
+{% for field in bcc_c_data_fields %}
+    {{ field }}
+{% endfor %}
+};
+
+BPF_PERF_OUTPUT(events);
+{% for init_table in bcc_c_init_tables %}
+{{ init_table }}
+{% endfor %}
+
+void trace0(struct pt_regs *ctx) {
+    struct data_t data = {};
+    {% for func_line in bcc_c_func_lines %}
+    {{ func_line }}
+    {% endfor %}
+    events.perf_submit(ctx, &data, sizeof(data));
+}
+'''
+
+
+b = bcc.BPF(text=text)
+b.attach_uprobe(
+    name='{{ tracee_pathname }}',
+    sym='{{ uprobe }}',
+    fn_name='trace0')
+
+
+class Data(ctypes.Structure):
+    _fields_ = [
+        {% for field in bcc_py_data_fields %}
+        {{ field }}
+        {% endfor %}
+    ]
+
+
+def print_event(_, data, __):
+    event = ctypes.cast(data, ctypes.POINTER(Data)).contents
+    {% for line in bcc_py_callback_lines %}
+    {{ line }}
+    {% endfor %}
+
+    {{ script }}
+
+
+print('tracing')
+b["events"].open_perf_buffer(print_event)
+while 1:
+    b.perf_buffer_poll()
+
