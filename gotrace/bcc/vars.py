@@ -50,13 +50,12 @@ class StackContext(VarContext):
         return ['("stack_id", ctypes.c_int),']
 
     def bcc_py_global(self) -> typing.List[str]:
-        return '''
-import os
+        sym_pid = self.script_parser.sym_pid
+        return f'''
 def get_stack(stack_id):
-    debug_pid = int(os.getenv('DEBUG_PID'))
     syms = []
     for addr in b.get_table('stack_traces').walk(stack_id):
-        sym = b.sym(addr, debug_pid, show_module=True, show_offset=True)
+        sym = b.sym(addr, {sym_pid}, show_module=True, show_offset=True)
         syms.append(sym.decode())
     return '\\n'.join(syms)
         '''.strip().split('\n')

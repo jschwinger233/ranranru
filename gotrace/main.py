@@ -6,8 +6,8 @@ from .trace import Trace
 
 @click.command(
     context_settings=dict(help_option_names=['-h', '--help']), )
-@click.option('-d',
-              '--debug-pathname',
+@click.option('-s',
+              '--sym-pathname',
               type=click.Path(exists=True, file_okay=True, dir_okay=False),
               required=False,
               help='corresponding non-stripped golang binary')
@@ -37,7 +37,7 @@ from .trace import Trace
     help='one line of program',
 )
 def main(
-    debug_pathname: str,
+    sym_pathname: str,
     verbose: bool,
     python: str,
     filename: str,
@@ -54,14 +54,10 @@ def main(
     trace = Trace(
         python=python,
         program=program,
-        debug_pathname=debug_pathname,
+        sym_pathname=sym_pathname,
         verbose=verbose,
     )
-    trace.parse()
-    try:
-        trace.start()
-    finally:
-        trace.wait()
+    trace.run()
 
 
 if __name__ == '__main__':

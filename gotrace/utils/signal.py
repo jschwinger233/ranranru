@@ -1,6 +1,7 @@
 import re
 import typing
 import signal
+import contextlib
 
 SIG_PAT = re.compile(r'SIG[A-Z]+')
 
@@ -18,3 +19,12 @@ def block_all():
 
 def unblock_all():
     signal.pthread_sigmask(signal.SIG_UNBLOCK, all_signals())
+
+
+@contextlib.contextmanager
+def block_signals():
+    block_all()
+    try:
+        yield
+    finally:
+        unblock_all()

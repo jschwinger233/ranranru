@@ -5,9 +5,8 @@ from gotrace.utils import process as procutils
 
 class Process(procutils.Process):
     @classmethod
-    def from_bcc_program(cls, bcc_program: str, *, python: str,
-                         debug_pid: int):
-        self = cls(python, '-', BCC_SYMFS='/tmp', DEBUG_PID=str(debug_pid))
+    def from_bcc_program(cls, bcc_program: str, *, python: str):
+        self = cls(python, '-', BCC_SYMFS='/tmp')
         self.bcc_program = bcc_program
         self._r: int = None
         self._w: int = None

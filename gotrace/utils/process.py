@@ -12,7 +12,7 @@ class Process:
 
         self._pid: int = None
 
-    def start(self):
+    def spawn(self):
         self.prefork()
         pid = os.fork()
         if pid == 0:

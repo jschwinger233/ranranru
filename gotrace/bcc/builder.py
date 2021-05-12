@@ -1,9 +1,12 @@
 import re
 import os
 import typing
+import contextlib
 import collections
 
 import jinja2
+
+from . import sym
 
 
 class Builder:
@@ -17,30 +20,53 @@ class Builder:
         lstrip_blocks=True,
     )
 
-    def __init__(self, program: str):
-        self.program = program
-
-        self._pathname: str = None
-        self._uprobe: str = None
-        self._script: str = None
+    def __init__(self, program: str, sym_pathname: str):
+        self._sym_pid: int = None
         self._ctx: typing.Dict[str, typing.List[str]] = {}
 
-    def parse(self):
-        m = self.pat.match(self.program)
+        m = self.pat.match(program)
         if not m:
             raise ValueError("wrong trace program, pattern doesn't match")
 
         self._pathname, self._uprobe, self._script = m.group(
             'pathname'), m.group('uprobe'), m.group('script')
 
-        script_parser = ScriptParser(self._script)
+        self.program = program
+        self.sym_process = sym.Process.from_pathname(sym_pathname or  # noqa
+                                                     self._pathname)
+
+    @contextlib.contextmanager
+    def setup(self):
+        self._setup_symbols()
+        try:
+            self._parse()
+            yield self._dumps()
+        finally:
+            self._wipeout_symbols()
+
+    def _setup_symbols(self):
+        self.sym_process.spawn()
+        try:
+            self.sym_process.setup_bcc_symfs(self._pathname)
+        except:  # noqa
+            self.sym_process.kill(9)
+            self.sym_process.wait()
+            raise
+
+        self._sym_pid = self.sym_process.pid
+
+    def _wipeout_symbols(self):
+        self.sym_process.kill(9)
+        self.sym_process.wait()
+        self.sym_process.wipeout_bcc_symfs()
+
+    def _parse(self):
+
+        script_parser = ScriptParser(self._script, self._sym_pid)
         script_parser.parse()
         self._ctx = script_parser.result_context()
 
-    def dumps(self) -> str:
-        if not self._uprobe:
-            raise RuntimeError('"dumps" must be called after "parse"')
-
+    def _dumps(self) -> str:
         return self.tmpl.render(
             tracee_pathname=self._pathname,
             uprobe=self._uprobe,
@@ -48,11 +74,12 @@ class Builder:
             **self._ctx,
         )
 
-    def tracee_pathname(self) -> str:
-        return self._pathname
-
 
 class VarContext:
+    def __init__(self, script_parser: 'ScriptParser'):
+        self.script_parser = script_parser
+        super().__init__()
+
     def bcc_py_imports(self) -> typing.List[str]:
         return []
 
@@ -80,17 +107,20 @@ class VarContext:
 
 class ScriptParser:
     missing_var_pat = re.compile(r"'(?P<missing_var>[^']+)")
-    _registered_vars: typing.Dict[str, typing.Tuple[str, VarContext]] = {}
+    _registered_vars: typing.Dict[str, typing.Tuple[str, typing.Callable[
+        ['ScriptParser'], VarContext]]] = {}
 
     @classmethod
     def register_var(cls, varname: str, placeholder: str):
         def register(context_cls):
-            cls._registered_vars[varname] = (placeholder, context_cls())
+            cls._registered_vars[varname] = (placeholder,
+                                             lambda self: context_cls(self))
 
         return register
 
-    def __init__(self, script: str):
+    def __init__(self, script: str, sym_pid: int):
         self.script = script
+        self.sym_pid = sym_pid
 
         self._missing_vars: typing.List[str] = None
 
@@ -100,7 +130,8 @@ class ScriptParser:
     def result_context(self) -> typing.Dict[str, typing.List[str]]:
         ctx = collections.defaultdict(list)
         for var in self._missing_vars:
-            _, var_ctx = self._registered_vars[var]
+            _, var_ctx_cls = self._registered_vars[var]
+            var_ctx = var_ctx_cls(self)
             ctx['bcc_py_imports'].extend(var_ctx.bcc_py_imports())
             ctx['bcc_c_headers'].extend(var_ctx.bcc_c_headers())
             ctx['bcc_c_data_fields'].extend(var_ctx.bcc_c_data_fields())

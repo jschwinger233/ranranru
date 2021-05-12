@@ -1,17 +1,18 @@
 import os
 import shutil
 import ctypes
+import contextlib
 import ctypes.util
 
-from .utils import process as procutils
+from gotrace.utils import process as procutils
 
 
 class Process(procutils.Process):
     libc = ctypes.CDLL(ctypes.util.find_library('c'), use_errno=True)
 
     @classmethod
-    def from_pathname(cls, debug_pathname: str):
-        self = cls(debug_pathname)
+    def from_pathname(cls, sym_pathname: str):
+        self = cls(sym_pathname)
         self._bcc_sym_pathname: str = None
         return self
 
@@ -20,8 +21,6 @@ class Process(procutils.Process):
 
     def wait(self):
         super().wait()
-        if self._bcc_sym_pathname:
-            os.remove(self._bcc_sym_pathname)
 
     def setup_bcc_symfs(self, tracee_pathname: str):
         bcc_symfs = '/tmp'
@@ -31,3 +30,7 @@ class Process(procutils.Process):
         shutil.copyfile(self.path,
                         self._bcc_sym_pathname,
                         follow_symlinks=True)
+
+    def wipeout_bcc_symfs(self):
+        with contextlib.suppress(Exception):
+            os.remove(self._bcc_sym_pathname)
