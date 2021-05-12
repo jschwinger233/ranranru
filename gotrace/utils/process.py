@@ -1,6 +1,5 @@
 import os
 import signal
-import typing
 
 from . import signal as sigutils
 
@@ -11,7 +10,7 @@ class Process:
         self.args = list(args)
         self.env = env
 
-        self._pid: typing.Optional[int] = None
+        self._pid: int = None
 
     def start(self):
         self.prefork()

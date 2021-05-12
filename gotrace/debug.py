@@ -11,12 +11,9 @@ class Process(procutils.Process):
 
     @classmethod
     def from_pathname(cls, debug_pathname: str):
-        return cls(debug_pathname)
-
-    def __init__(self, *args, **kws):
-        super().__init__(*args, **kws)
-
+        self = cls(debug_pathname)
         self._bcc_sym_pathname: str = None
+        return self
 
     def preexec(self):
         self.libc.ptrace(0, 0, None, None)
