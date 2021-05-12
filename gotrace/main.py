@@ -93,13 +93,14 @@ class Gotrace:
 
         if self._debug_process:
             self._debug_process.start()
-            self._bcc_builder.debug_pid = self._debug_process.pid
 
         if self.verbose:
             print(self._bcc_builder.dumps())
 
         self._bcc_process = bcc.Process.from_bcc_program(
-            self.python, self._bcc_builder.dumps())
+            self._bcc_builder.dumps(),
+            python=self.python,
+            debug_pid=self._debug_process.pid)
 
         if self._debug_process:
             self._debug_process.setup_bcc_symfs(

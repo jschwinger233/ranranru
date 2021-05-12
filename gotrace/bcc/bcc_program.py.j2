@@ -1,31 +1,31 @@
 import bcc
 import ctypes
-{% for import in bcc_py_imports %}
-{{ impoort }}
+{% for line in bcc_py_imports %}
+{{ line }}
 {% endfor %}
 
 text = '''
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
-{% for header in bcc_c_headers %}
-{{ header }}
+{% for line in bcc_c_headers %}
+{{ line }}
 {% endfor %}
 
 struct data_t {
-{% for field in bcc_c_data_fields %}
-    {{ field }}
+{% for line in bcc_c_data_fields %}
+    {{ line }}
 {% endfor %}
 };
 
 BPF_PERF_OUTPUT(events);
-{% for init_table in bcc_c_init_tables %}
-{{ init_table }}
+{% for line in bcc_c_global %}
+{{ line }}
 {% endfor %}
 
 void trace0(struct pt_regs *ctx) {
     struct data_t data = {};
-    {% for func_line in bcc_c_func_lines %}
-    {{ func_line }}
+    {% for line in bcc_c_func_body %}
+    {{ line }}
     {% endfor %}
     events.perf_submit(ctx, &data, sizeof(data));
 }
@@ -41,18 +41,22 @@ b.attach_uprobe(
 
 class Data(ctypes.Structure):
     _fields_ = [
-        {% for field in bcc_py_data_fields %}
-        {{ field }}
+        {% for line in bcc_py_data_fields %}
+        {{ line }}
         {% endfor %}
     ]
 
 
+{% for line in bcc_py_global %}
+{{ line }}
+{% endfor %}
+
+
 def print_event(_, data, __):
     event = ctypes.cast(data, ctypes.POINTER(Data)).contents
-    {% for line in bcc_py_callback_lines %}
+    {% for line in bcc_py_callback_body %}
     {{ line }}
     {% endfor %}
-
     {{ script }}
 
 
