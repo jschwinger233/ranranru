@@ -10,8 +10,9 @@ from . import sym
 
 
 class Builder:
-    pat = re.compile(
+    pat_program = re.compile(
         r'(?P<pathname>[^:]+):(?P<uprobe>\S+)\s+\{(?P<script>.*)\}', re.S)
+    pat_addr = re.compile(r'^[x0-9a-z]+$')
 
     tmpl = jinja2.Template(
         open(os.path.join(os.path.dirname(__file__),
@@ -22,14 +23,17 @@ class Builder:
 
     def __init__(self, program: str, sym_pathname: str):
         self._sym_pid: int = None
-        self._ctx: typing.Dict[str, typing.List[str]] = {}
+        self.render_ctx: typing.Dict[str, typing.List[str]] = {}
 
-        m = self.pat.match(program)
+        m = self.pat_program.match(program)
         if not m:
             raise ValueError("wrong trace program, pattern doesn't match")
 
-        self._pathname, self._uprobe, self._script = m.group(
+        self._pathname, uprobe, self._script = m.group(
             'pathname'), m.group('uprobe'), m.group('script')
+        self._uprobe_directive = f"sym='{uprobe}'"
+        if self.pat_addr.match(uprobe):
+            self._uprobe_directive = f'addr={uprobe}'
 
         self.program = program
         self.sym_process = sym.Process.from_pathname(sym_pathname or  # noqa
@@ -64,21 +68,21 @@ class Builder:
 
         script_parser = ScriptParser(self._script, self._sym_pid)
         script_parser.parse()
-        self._ctx = script_parser.result_context()
+        self.render_ctx = script_parser.get_render_context()
 
     def _dumps(self) -> str:
         return self.tmpl.render(
             tracee_pathname=self._pathname,
-            uprobe=self._uprobe,
+            uprobe_directive=self._uprobe_directive,
             script=self._script,
-            **self._ctx,
+            **self.render_ctx,
         )
 
 
-class VarContext:
-    def __init__(self, script_parser: 'ScriptParser'):
+class ScriptVar:
+    def __init__(self, script_parser: 'ScriptParser', ctx: typing.Any):
         self.script_parser = script_parser
-        super().__init__()
+        self.ctx = ctx
 
     def bcc_py_imports(self) -> typing.List[str]:
         return []
@@ -108,13 +112,14 @@ class VarContext:
 class ScriptParser:
     missing_var_pat = re.compile(r"'(?P<missing_var>[^']+)")
     _registered_vars: typing.Dict[str, typing.Tuple[str, typing.Callable[
-        ['ScriptParser'], VarContext]]] = {}
+        ['ScriptParser'], ScriptVar]]] = {}
 
     @classmethod
     def register_var(cls, varname: str, placeholder: str):
-        def register(context_cls):
-            cls._registered_vars[varname] = (placeholder,
-                                             lambda self: context_cls(self))
+        def register(var_cls):
+            cls._registered_vars[varname] = (
+                placeholder, lambda self: var_cls(
+                    self, self._missing_vars_ctx.get(varname)))
 
         return register
 
@@ -123,30 +128,35 @@ class ScriptParser:
         self.sym_pid = sym_pid
 
         self._missing_vars: typing.List[str] = None
+        self._missing_vars_ctx: typing.Dict[str, typing.Any] = None
 
     def parse(self):
-        self._missing_vars = self._parse_missing_vars(self.script)
+        self._missing_vars, self._missing_vars_ctx = self._parse_missing_vars(
+            self.script)
 
-    def result_context(self) -> typing.Dict[str, typing.List[str]]:
+    def get_render_context(self) -> typing.Dict[str, typing.List[str]]:
         ctx = collections.defaultdict(list)
-        for var in self._missing_vars:
-            _, var_ctx_cls = self._registered_vars[var]
-            var_ctx = var_ctx_cls(self)
-            ctx['bcc_py_imports'].extend(var_ctx.bcc_py_imports())
-            ctx['bcc_c_headers'].extend(var_ctx.bcc_c_headers())
-            ctx['bcc_c_data_fields'].extend(var_ctx.bcc_c_data_fields())
-            ctx['bcc_c_global'].extend(var_ctx.bcc_c_global())
-            ctx['bcc_c_func_body'].extend(var_ctx.bcc_c_func_body())
-            ctx['bcc_py_data_fields'].extend(var_ctx.bcc_py_data_fields())
-            ctx['bcc_py_global'].extend(var_ctx.bcc_py_global())
-            ctx['bcc_py_callback_body'].extend(var_ctx.bcc_py_callback_body())
+        for varname in self._missing_vars:
+            _, var_cls = self._registered_vars[varname]
+            var = var_cls(self)
+            ctx['bcc_py_imports'].extend(var.bcc_py_imports())
+            ctx['bcc_c_headers'].extend(var.bcc_c_headers())
+            ctx['bcc_c_data_fields'].extend(var.bcc_c_data_fields())
+            ctx['bcc_c_global'].extend(var.bcc_c_global())
+            ctx['bcc_c_func_body'].extend(var.bcc_c_func_body())
+            ctx['bcc_py_data_fields'].extend(var.bcc_py_data_fields())
+            ctx['bcc_py_global'].extend(var.bcc_py_global())
+            ctx['bcc_py_callback_body'].extend(var.bcc_py_callback_body())
         return dict(ctx)
 
-    def _parse_missing_vars(self, script: str) -> typing.List[str]:
+    def _parse_missing_vars(
+        self, script: str
+    ) -> typing.Tuple[typing.List[str], typing.Dict[str, typing.Any]]:
         missing_vars = []
         while True:
+            g = {'var_ctx': {}}
             try:
-                exec(script, {}, {})
+                exec(script, g, {})
 
             except NameError as e:
                 missing_var = self.missing_var_pat.search(
@@ -156,7 +166,7 @@ class ScriptParser:
 
                 missing_vars.append(missing_var)
                 placeholder, _ = self._registered_vars[missing_var]
-                script = f'{missing_var} = {placeholder}\n{script}'
+                script = f'{placeholder}\n{script}'
 
             except:  # noqa
                 raise ValueError(f'invalid python script: \n{script}')
@@ -164,4 +174,4 @@ class ScriptParser:
             else:
                 break
 
-        return missing_vars
+        return missing_vars, g['var_ctx']

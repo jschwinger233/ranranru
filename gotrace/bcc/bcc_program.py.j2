@@ -36,7 +36,7 @@ void trace0(struct pt_regs *ctx) {
 b = bcc.BPF(text=text)
 b.attach_uprobe(
     name='{{ tracee_pathname }}',
-    sym='{{ uprobe }}',
+    {{ uprobe_directive }},
     fn_name='trace0')
 
 

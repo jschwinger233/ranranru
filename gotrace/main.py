@@ -34,6 +34,7 @@ from .trace import Trace
     '-e',
     '--program',
     required=False,
+    default='',
     help='one line of program',
 )
 def main(
