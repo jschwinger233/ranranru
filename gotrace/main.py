@@ -30,12 +30,11 @@ from .trace import Trace
               type=click.Path(exists=True, file_okay=True, dir_okay=False),
               required=False,
               help='filename of program')
-@click.option(
-    '-e',
-    '--program',
-    required=False,
+@click.argument(
+    'program',
+    nargs=1,
     default='',
-    help='one line of program',
+    required=False,
 )
 def main(
     sym_pathname: str,
@@ -50,7 +49,7 @@ def main(
 
     if filename:
         with open(filename) as f:
-            program += f.read()
+            program += f.read().strip()
 
     trace = Trace(
         python=python,

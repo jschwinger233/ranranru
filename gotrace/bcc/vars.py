@@ -2,7 +2,7 @@ import re
 import typing
 import dataclasses
 
-from .builder import ScriptParser, ScriptVar
+from .renderer import ScriptParser, ScriptVar
 
 
 @ScriptParser.register_var('pid', 'pid = 0')

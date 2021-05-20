@@ -7,11 +7,14 @@ import collections
 import jinja2
 
 from . import sym
+from gotrace.utils import io as ioutils
 
 
-class Builder:
+class Renderer:
     pat_program = re.compile(
-        r'(?P<pathname>[^:]+):(?P<uprobe>\S+)\s+\{(?P<script>.*)\}', re.S)
+        r'''^(?P<pathname>[^:]+):(?P<uprobe>\S+)  # [bin]:[uprobe]
+        \s+
+        \{\s*(?P<script>.*?)\s*\}$  # { [python_script] }''', re.S | re.X)
     pat_addr = re.compile(r'^[x0-9a-z]+$')
 
     tmpl = jinja2.Template(
@@ -29,8 +32,8 @@ class Builder:
         if not m:
             raise ValueError("wrong trace program, pattern doesn't match")
 
-        self._pathname, uprobe, self._script = m.group(
-            'pathname'), m.group('uprobe'), m.group('script')
+        self._pathname, uprobe, self._script = m.group('pathname'), m.group(
+            'uprobe'), m.group('script')
         self._uprobe_directive = f"sym='{uprobe}'"
         if self.pat_addr.match(uprobe):
             self._uprobe_directive = f'addr={uprobe}'
@@ -40,7 +43,7 @@ class Builder:
                                                      self._pathname)
 
     @contextlib.contextmanager
-    def setup(self):
+    def render(self):
         self._setup_symbols()
         try:
             self._parse()
@@ -84,6 +87,10 @@ class ScriptVar:
         self.script_parser = script_parser
         self.ctx = ctx
 
+    @staticmethod
+    def template_methods() -> typing.List[str]:
+        return [meth for meth in dir(__class__) if meth.startswith('bcc_')]
+
     def bcc_py_imports(self) -> typing.List[str]:
         return []
 
@@ -117,9 +124,8 @@ class ScriptParser:
     @classmethod
     def register_var(cls, varname: str, placeholder: str):
         def register(var_cls):
-            cls._registered_vars[varname] = (
-                placeholder, lambda self: var_cls(
-                    self, self._missing_vars_ctx.get(varname)))
+            cls._registered_vars[varname] = (placeholder, lambda self: var_cls(
+                self, self._missing_vars_ctx.get(varname)))
 
         return register
 
@@ -139,14 +145,8 @@ class ScriptParser:
         for varname in self._missing_vars:
             _, var_cls = self._registered_vars[varname]
             var = var_cls(self)
-            ctx['bcc_py_imports'].extend(var.bcc_py_imports())
-            ctx['bcc_c_headers'].extend(var.bcc_c_headers())
-            ctx['bcc_c_data_fields'].extend(var.bcc_c_data_fields())
-            ctx['bcc_c_global'].extend(var.bcc_c_global())
-            ctx['bcc_c_func_body'].extend(var.bcc_c_func_body())
-            ctx['bcc_py_data_fields'].extend(var.bcc_py_data_fields())
-            ctx['bcc_py_global'].extend(var.bcc_py_global())
-            ctx['bcc_py_callback_body'].extend(var.bcc_py_callback_body())
+            for meth in var.template_methods():
+                ctx[meth].extend(getattr(var, meth)())
         return dict(ctx)
 
     def _parse_missing_vars(
@@ -156,7 +156,8 @@ class ScriptParser:
         while True:
             g = {'var_ctx': {}}
             try:
-                exec(script, g, {})
+                with ioutils.redirect({1: '/dev/null', 2: '/dev/null'}):
+                    exec(script, g, {})
 
             except NameError as e:
                 missing_var = self.missing_var_pat.search(

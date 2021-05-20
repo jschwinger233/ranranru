@@ -58,7 +58,10 @@ def print_event(_, data, __):
     {% for line in bcc_py_callback_body %}
     {{ line }}
     {% endfor %}
-    {{ script }}
+    {% set script_lines = script.split('\n') %}
+    {% for line in script_lines %}
+    {{ line }}
+    {% endfor %}
 
 
 print('tracing')

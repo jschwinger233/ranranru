@@ -15,11 +15,11 @@ class Trace:
         self.verbose = verbose
         self.python = python
 
-        self._bcc_builder = bcc.Builder(program, sym_pathname)
+        self._bcc_renderer = bcc.Renderer(program, sym_pathname)
 
     def run(self):
         with sigutils.block_signals():
-            with self._bcc_builder.setup() as bcc_program:
+            with self._bcc_renderer.render() as bcc_program:
                 if self.verbose:
                     print(bcc_program)
 

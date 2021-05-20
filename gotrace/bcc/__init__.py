@@ -1,5 +1,5 @@
 from . import vars  # noqa
-from .builder import Builder
+from .renderer import Renderer
 from .process import Process
 
-__all__ = ['Builder', 'Process']
+__all__ = ['Renderer', 'Process']
