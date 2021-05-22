@@ -17,6 +17,12 @@ from .trace import Trace
               default=False,
               show_default=True,
               help='print BCC program before executing')
+@click.option('-vv',
+              '--very-verbose',
+              is_flag=True,
+              default=False,
+              show_default=True,
+              help='print BCC program with line numbers before executing')
 @click.option(
     '-p',
     '--python',
@@ -39,6 +45,7 @@ from .trace import Trace
 def main(
     sym_pathname: str,
     verbose: bool,
+    very_verbose: bool,
     python: str,
     filename: str,
     program: str,
@@ -51,11 +58,14 @@ def main(
         with open(filename) as f:
             program += f.read().strip()
 
+    verbose_level = 1 if verbose else 0
+    verbose_level = 2 if very_verbose else verbose_level
+
     trace = Trace(
         python=python,
         program=program,
         sym_pathname=sym_pathname,
-        verbose=verbose,
+        verbose_level=verbose_level,
     )
     trace.run()
 

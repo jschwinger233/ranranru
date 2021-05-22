@@ -2,15 +2,15 @@ import re
 import typing
 import dataclasses
 
-from .renderer import ScriptParser, ScriptVar
+from . import render_context
 
 
-@ScriptParser.register_var('pid', 'pid = 0')
-class PidVar(ScriptVar):
+@render_context.UserScriptParser.register_var('pid', 'pid = 0')
+class PidVar(render_context.UserScriptVar):
     def bcc_c_data_fields(self) -> typing.List[str]:
         return ['u32 pid;']
 
-    def bcc_c_func_body(self) -> typing.List[str]:
+    def bcc_c_callback_body(self) -> typing.List[str]:
         return ['data.pid = bpf_get_current_pid_tgid() >> 32;']
 
     def bcc_py_data_fields(self) -> typing.List[str]:
@@ -20,12 +20,12 @@ class PidVar(ScriptVar):
         return ['pid = event.pid']
 
 
-@ScriptParser.register_var('comm', "comm = ''")
-class CommVar(ScriptVar):
+@render_context.UserScriptParser.register_var('comm', "comm = ''")
+class CommVar(render_context.UserScriptVar):
     def bcc_c_data_fields(self) -> typing.List[str]:
         return ['char comm[16];']
 
-    def bcc_c_func_body(self) -> typing.List[str]:
+    def bcc_c_callback_body(self) -> typing.List[str]:
         return ['bpf_get_current_comm(&data.comm, sizeof(data.comm));']
 
     def bcc_py_data_fields(self) -> typing.List[str]:
@@ -35,15 +35,15 @@ class CommVar(ScriptVar):
         return ['comm = event.comm.decode()']
 
 
-@ScriptParser.register_var('stack', "stack = ''")
-class StackVar(ScriptVar):
+@render_context.UserScriptParser.register_var('stack', "stack = ''")
+class StackVar(render_context.UserScriptVar):
     def bcc_c_data_fields(self) -> typing.List[str]:
         return ['int stack_id;']
 
     def bcc_c_global(self) -> typing.List[str]:
         return ['BPF_STACK_TRACE(stack_traces, 128);']
 
-    def bcc_c_func_body(self) -> typing.List[str]:
+    def bcc_c_callback_body(self) -> typing.List[str]:
         return [
             'data.stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);'
         ]
@@ -66,13 +66,13 @@ def get_stack(stack_id):
         return ['stack = get_stack(event.stack_id)']
 
 
-@ScriptParser.register_var('peek', '''
+@render_context.UserScriptParser.register_var('peek', '''
 def peek(offsets, type):
     global var_ctx
     args = var_ctx.setdefault('peek', [])
     args.append((offsets, type))
         '''.strip())
-class PeekVar(ScriptVar):
+class PeekVar(render_context.UserScriptVar):
     @dataclasses.dataclass
     class PeekType:
         c_struct_field: str
@@ -93,7 +93,7 @@ class PeekVar(ScriptVar):
         ),
     }
 
-    def __init__(self, script_parser: 'ScriptParser',
+    def __init__(self, script_parser: 'render_context.UserScriptParser',
                  ctx: typing.List[typing.Tuple[str, str]]):
         for offsets, type in ctx:
             if not self.pat.match(offsets):
@@ -109,7 +109,7 @@ class PeekVar(ScriptVar):
             res.append(self.typemap[type].c_struct_field.format(f'peek{i}'))
         return res
 
-    def bcc_c_func_body(self) -> typing.List[str]:
+    def bcc_c_callback_body(self) -> typing.List[str]:
         res = []
         for i, (offsets, type) in enumerate(self.ctx):
             r = []

@@ -33,12 +33,14 @@ class Process:
         if not self._pid:
             raise RuntimeError('process is not running')
 
+        os.waitpid(self._pid, 0)
+
+    def proxy_signals(self):
         while True:
             si = signal.sigwaitinfo(sigutils.all_signals())
-            if (si.si_signo == signal.SIGCHLD and si.si_pid == self._pid):
-                self._pid = None
+            if si.si_signo == signal.SIGCHLD and si.si_pid == self._pid:
+                self.wait()
                 return
-
             self.kill(si.si_signo)
 
     @property

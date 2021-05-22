@@ -9,26 +9,28 @@ class Trace:
         python: str,
         program: str,
         sym_pathname: str,
-        verbose: bool,
+        verbose_level: int,
     ):
         self.program = program
-        self.verbose = verbose
         self.python = python
+        self.verbose_level = verbose_level
 
         self._bcc_renderer = bcc.Renderer(program, sym_pathname)
 
     def run(self):
         with sigutils.block_signals():
             with self._bcc_renderer.render() as bcc_program:
-                if self.verbose:
-                    print(bcc_program)
+                if self.verbose_level:
+                    for no, l in enumerate(bcc_program.splitlines()):
+                        if self.verbose_level > 1:
+                            print(no, end='\t')
+                        print(l)
 
-                bcc_process = bcc.Process.from_bcc_program(
-                    bcc_program,
-                    python=self.python)
+                bcc_process = bcc.Process.from_bcc_program(bcc_program,
+                                                           python=self.python)
 
                 try:
                     bcc_process.spawn()
 
                 finally:
-                    bcc_process.wait()
+                    bcc_process.proxy_signals()

@@ -8,6 +8,7 @@ with open('./gotrace/__version__.py') as f:
 REQUIREMENTS = [
     'click>=7,<8',
     'jinja2>=2,<3',
+    'regex==2021.4.4',
 ]
 
 setup(name='gotrace',

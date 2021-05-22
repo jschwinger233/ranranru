@@ -1,6 +1,6 @@
 import bcc
 import ctypes
-{% for line in bcc_py_imports %}
+{% for line in globals.bcc_py_imports %}
 {{ line }}
 {% endfor %}
 
@@ -8,64 +8,72 @@ import ctypes
 text = '''
 #include <uapi/linux/ptrace.h>
 #include <linux/sched.h>
-{% for line in bcc_c_headers %}
+{% for line in globals.bcc_c_headers %}
 {{ line }}
 {% endfor %}
 
-struct data_t {
-{% for line in bcc_c_data_fields %}
+{% for trace in tracepoints %}
+
+struct data{{loop.index0}}_t {
+{% for line in trace.bcc_c_data_fields %}
     {{ line }}
 {% endfor %}
 };
 
-BPF_PERF_OUTPUT(events);
-{% for line in bcc_c_global %}
+BPF_PERF_OUTPUT(events{{loop.index0}});
+{% for line in trace.bcc_c_global %}
 {{ line }}
 {% endfor %}
 
-void trace0(struct pt_regs *ctx) {
-    struct data_t data = {};
-    {% for line in bcc_c_func_body %}
+void trace{{loop.index0}}(struct pt_regs *ctx) {
+    struct data{{loop.index0}}_t data = {};
+    {% for line in trace.bcc_c_callback_body %}
     {{ line }}
     {% endfor %}
-    events.perf_submit(ctx, &data, sizeof(data));
+    events{{loop.index0}}.perf_submit(ctx, &data, sizeof(data));
 }
+
+{% endfor %}
 '''
 
 
 b = bcc.BPF(text=text)
+{% for trace in tracepoints %}
 b.attach_uprobe(
-    name='{{ tracee_pathname }}',
-    {{ uprobe_directive }},
-    fn_name='trace0')
+    name='{{ trace.attach_pathname }}',
+    {{trace.attach_type}}={{ trace.attach_uprobe }},
+    fn_name='trace{{loop.index0}}')
+{% endfor %}
 
 
-class Data(ctypes.Structure):
+{% for trace in tracepoints %}
+class Data{{loop.index0}}(ctypes.Structure):
     _fields_ = [
-        {% for line in bcc_py_data_fields %}
+        {% for line in trace.bcc_py_data_fields %}
         {{ line }}
         {% endfor %}
     ]
 
-
-{% for line in bcc_py_global %}
+{% for line in trace.bcc_py_global %}
 {{ line }}
 {% endfor %}
 
-
-def print_event(_, data, __):
-    event = ctypes.cast(data, ctypes.POINTER(Data)).contents
-    {% for line in bcc_py_callback_body %}
+def callback{{loop.index0}}(_, data, __):
+    event = ctypes.cast(data, ctypes.POINTER(Data{{loop.index0}})).contents
+    {% for line in trace.bcc_py_callback_body %}
     {{ line }}
     {% endfor %}
-    {% set script_lines = script.split('\n') %}
+    {% set script_lines = trace.bcc_py_user_script.split('\n') %}
     {% for line in script_lines %}
     {{ line }}
     {% endfor %}
 
 
+b["events{{loop.index0}}"].open_perf_buffer(callback{{loop.index0}})
+
+
+{% endfor %}
 print('tracing')
-b["events"].open_perf_buffer(print_event)
 while 1:
     b.perf_buffer_poll()
 
