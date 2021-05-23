@@ -10,8 +10,7 @@ from . import render_context
 
 class Renderer:
     pat_program = regex.compile(
-        r'''(?P<bin> /\S+) # [bin], startswith '/'
-        \s+
+        r'''
         (?P<reg_mark> /?) (?P<uprobe> \S+) (?P=reg_mark)  # /[regex]/ or [raw]
         \s+
         (?P<script> \{ (:?[^{}]|(?&script))* \} )  # { [python_script] }''',
@@ -24,9 +23,10 @@ class Renderer:
         lstrip_blocks=True,
     )
 
-    def __init__(self, program: str, sym_pathname: str):
+    def __init__(self, program: str, tracee: str, tracee_sym: str):
         self.program = program
-        self.sym_pathname = sym_pathname
+        self.tracee = tracee
+        self.tracee_sym = tracee_sym
 
     @contextlib.contextmanager
     def _parse(
@@ -38,14 +38,14 @@ class Renderer:
 
         ctx_managers = []
         for match in self.pat_program.finditer(self.program):
-            pathname, reg_mark, uprobe, script, *_ = match.group(
-                'bin', 'reg_mark', 'uprobe', 'script')
+            reg_mark, uprobe, script, *_ = match.group('reg_mark', 'uprobe',
+                                                       'script')
             ctx_managers.append(
                 render_context.RenderContextManager(
-                    pathname,
+                    self.tracee,
                     uprobe,
                     script[1:-1].strip(),
-                    sym_pathname=self.sym_pathname,
+                    tracee_sym=self.tracee_sym,
                     uprobe_regex=True if reg_mark else False))
 
         with contextlib.ExitStack() as stack:

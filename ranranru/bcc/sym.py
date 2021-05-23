@@ -4,7 +4,7 @@ import ctypes
 import contextlib
 import ctypes.util
 
-from gbt.utils import process as procutils
+from ..utils import process as procutils
 
 
 class Process(procutils.Process):

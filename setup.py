@@ -2,7 +2,7 @@ from setuptools import setup
 from setuptools import find_packages
 
 about = {}
-with open('./gbt/__version__.py') as f:
+with open('./ranranru/__version__.py') as f:
     exec(f.read(), about)
 
 REQUIREMENTS = [
@@ -11,11 +11,11 @@ REQUIREMENTS = [
     'regex==2021.4.4',
 ]
 
-setup(name='gbt',
+setup(name='ranranru',
       python_requires='>=3.7',
       version=about['__version__'],
       packages=find_packages(),
-      entry_points={'console_scripts': ['gbt=gbt.main:main']},
+      entry_points={'console_scripts': ['rrr=ranranru.main:main']},
       author_email='greyschwinger@gmail.com',
       install_requires=REQUIREMENTS,
       zip_safe=False)

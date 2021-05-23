@@ -6,11 +6,6 @@ from .trace import Trace
 
 @click.command(
     context_settings=dict(help_option_names=['-h', '--help']), )
-@click.option('-s',
-              '--sym-pathname',
-              type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              required=False,
-              help='corresponding non-stripped golang binary')
 @click.option('-v',
               '--verbose',
               is_flag=True,
@@ -32,10 +27,16 @@ from .trace import Trace
     help='python interpreter to execute bcc program',
 )
 @click.option('-f',
-              '--filename',
+              '--program-filename',
               type=click.Path(exists=True, file_okay=True, dir_okay=False),
               required=False,
               help='filename of program')
+@click.option(
+    '-t',
+    '--tracee-binary',
+    required=True,
+    help= 'golang binary to trace, can specify non-stripped binary by format [bin]:[sym-bin]'  # noqa
+)
 @click.argument(
     'program',
     nargs=1,
@@ -43,28 +44,31 @@ from .trace import Trace
     required=False,
 )
 def main(
-    sym_pathname: str,
     verbose: bool,
     very_verbose: bool,
     python: str,
-    filename: str,
+    tracee_binary: str,
+    program_filename: str,
     program: str,
 ):
 
-    if not filename and not program:
+    if not program_filename and not program:
         raise click.BadParameter('either trace code or file is required')
 
-    if filename:
-        with open(filename) as f:
+    if program_filename:
+        with open(program_filename) as f:
             program += f.read().strip()
 
     verbose_level = 1 if verbose else 0
     verbose_level = 2 if very_verbose else verbose_level
 
+    tracee, tracee_sym, *_ = f'{tracee_binary}:'.split(':')
+
     trace = Trace(
         python=python,
         program=program,
-        sym_pathname=sym_pathname,
+        tracee=tracee,
+        tracee_sym=tracee_sym,
         verbose_level=verbose_level,
     )
     trace.run()

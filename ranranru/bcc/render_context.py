@@ -51,15 +51,15 @@ class TracePointContext:
 
 
 class RenderContextManager:
-    def __init__(self, pathname: str, uprobe: str, script: str, *,
-                 sym_pathname: str, uprobe_regex: bool):
-        self.pathname = pathname
+    def __init__(self, tracee: str, uprobe: str, script: str, *,
+                 tracee_sym: str, uprobe_regex: bool):
+        self.tracee = tracee
         self.uprobe = uprobe
         self.script = script
         self.uprobe_regex = uprobe_regex
 
-        self._sym_process = sym.Process.from_pathname(sym_pathname or  # noqa
-                                                      self.pathname)
+        self._sym_process = sym.Process.from_pathname(tracee_sym or  # noqa
+                                                      self.tracee)
 
     @contextlib.contextmanager
     def dump(self) -> typing.Tuple[GlobalContext, TracePointContext]:
@@ -76,7 +76,7 @@ class RenderContextManager:
             operator.getitem(script_ctx, item)
             for item in ('bcc_py_imports', 'bcc_c_headers')
         ]), TracePointContext(
-            self.pathname, self.uprobe, self.uprobe_regex, self.script, *[
+            self.tracee, self.uprobe, self.uprobe_regex, self.script, *[
                 operator.getitem(script_ctx, item)
                 for item in ('bcc_c_data_fields', 'bcc_c_global',
                              'bcc_c_callback_body', 'bcc_py_data_fields',
@@ -86,7 +86,7 @@ class RenderContextManager:
     def _setup_symbols(self):
         self._sym_process.spawn()
         try:
-            self._sym_process.setup_bcc_symfs(self.pathname)
+            self._sym_process.setup_bcc_symfs(self.tracee)
         except:  # noqa
             self._sym_process.kill(9)
             self._sym_process.wait()

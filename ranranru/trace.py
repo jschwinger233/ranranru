@@ -8,14 +8,15 @@ class Trace:
         *,
         python: str,
         program: str,
-        sym_pathname: str,
+        tracee: str,
+        tracee_sym: str,
         verbose_level: int,
     ):
         self.program = program
         self.python = python
         self.verbose_level = verbose_level
 
-        self._bcc_renderer = bcc.Renderer(program, sym_pathname)
+        self._bcc_renderer = bcc.Renderer(program, tracee, tracee_sym)
 
     def run(self):
         with sigutils.block_signals():
