@@ -10,9 +10,12 @@ from . import render_context
 
 class Renderer:
     pat_program = regex.compile(
-        r'''(/[^:]+):(\S+)  # [bin]:[uprobe]
+        r'''(?P<bin> /\S+) # [bin], startswith '/'
         \s+
-        ( \{ (:?[^{}]|(?3))* \} )  # { [python_script] }''', regex.S | regex.X)
+        (?P<reg_mark> /?) (?P<uprobe> \S+) (?P=reg_mark)  # /[regex]/ or [raw]
+        \s+
+        (?P<script> \{ (:?[^{}]|(?&script))* \} )  # { [python_script] }''',
+        regex.S | regex.X)
 
     tmpl = jinja2.Template(
         open(os.path.join(os.path.dirname(__file__),
@@ -35,13 +38,15 @@ class Renderer:
 
         ctx_managers = []
         for match in self.pat_program.finditer(self.program):
-            pathname, uprobe, script, *_ = match.groups()
+            pathname, reg_mark, uprobe, script, *_ = match.group(
+                'bin', 'reg_mark', 'uprobe', 'script')
             ctx_managers.append(
                 render_context.RenderContextManager(
                     pathname,
                     uprobe,
                     script[1:-1].strip(),
-                    sym_pathname=self.sym_pathname))
+                    sym_pathname=self.sym_pathname,
+                    uprobe_regex=True if reg_mark else False))
 
         with contextlib.ExitStack() as stack:
             ctxes = [stack.enter_context(m.dump()) for m in ctx_managers]

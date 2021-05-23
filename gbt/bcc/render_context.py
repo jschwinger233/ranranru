@@ -25,6 +25,7 @@ class GlobalContext:
 class TracePointContext:
     attach_pathname: str
     attach_uprobe: str
+    attach_uprobe_regex: bool
     bcc_py_user_script: str
 
     bcc_c_data_fields: typing.List[str]
@@ -40,16 +41,22 @@ class TracePointContext:
     def __post_init__(self):
         self.attach_type = 'addr' if re.match(r'^[x0-9a-x]+$',
                                               self.attach_uprobe) else 'sym'
+        if self.attach_uprobe_regex:
+            self.attach_type = 'sym_re'
+
         if self.attach_type == 'sym':
             self.attach_uprobe = f"'{self.attach_uprobe}'"
+        if self.attach_type == 'sym_re':
+            self.attach_uprobe = f"r'{self.attach_uprobe}'"
 
 
 class RenderContextManager:
     def __init__(self, pathname: str, uprobe: str, script: str, *,
-                 sym_pathname: str):
+                 sym_pathname: str, uprobe_regex: bool):
         self.pathname = pathname
         self.uprobe = uprobe
         self.script = script
+        self.uprobe_regex = uprobe_regex
 
         self._sym_process = sym.Process.from_pathname(sym_pathname or  # noqa
                                                       self.pathname)
@@ -69,7 +76,7 @@ class RenderContextManager:
             operator.getitem(script_ctx, item)
             for item in ('bcc_py_imports', 'bcc_c_headers')
         ]), TracePointContext(
-            self.pathname, self.uprobe, self.script, *[
+            self.pathname, self.uprobe, self.uprobe_regex, self.script, *[
                 operator.getitem(script_ctx, item)
                 for item in ('bcc_c_data_fields', 'bcc_c_global',
                              'bcc_c_callback_body', 'bcc_py_data_fields',
