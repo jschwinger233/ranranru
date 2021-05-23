@@ -1,6 +1,6 @@
 import os
 
-from gotrace.utils import process as procutils
+from gbt.utils import process as procutils
 
 
 class Process(procutils.Process):

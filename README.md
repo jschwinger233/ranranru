@@ -1,4 +1,4 @@
-# gotrace
-A non-ambitious BCC tool focusing on Golang tracing.
+# gbt
+A BCC tool for Golang dynamic tracing.
 
 Under construction...
