@@ -37,6 +37,12 @@ from .trace import Trace
     required=True,
     help= 'golang binary to trace, can specify non-stripped binary by format [bin]:[sym-bin]'  # noqa
 )
+@click.option(
+    '--dry-run',
+    is_flag=True,
+    default=False,
+    help='don\'t execute bcc script, useful with -v',
+)
 @click.argument(
     'program',
     nargs=1,
@@ -49,6 +55,7 @@ def main(
     python: str,
     tracee_binary: str,
     program_filename: str,
+    dry_run: bool,
     program: str,
 ):
 
@@ -71,7 +78,7 @@ def main(
         tracee_sym=tracee_sym,
         verbose_level=verbose_level,
     )
-    trace.run()
+    trace.run(dry_run)
 
 
 if __name__ == '__main__':

@@ -18,7 +18,7 @@ class Trace:
 
         self._bcc_renderer = bcc.Renderer(program, tracee, tracee_sym)
 
-    def run(self):
+    def run(self, dry: bool):
         with sigutils.block_signals():
             with self._bcc_renderer.render() as bcc_program:
                 if self.verbose_level:
@@ -29,6 +29,9 @@ class Trace:
 
                 bcc_process = bcc.Process.from_bcc_program(bcc_program,
                                                            python=self.python)
+
+                if dry:
+                    return
 
                 try:
                     bcc_process.spawn()
