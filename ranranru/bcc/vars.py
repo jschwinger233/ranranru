@@ -20,6 +20,21 @@ class PidVar(render_context.UserScriptVar):
         return ['pid = event.pid']
 
 
+@render_context.UserScriptParser.register_var('tid', 'tid = 0')
+class TidVar(render_context.UserScriptVar):
+    def bcc_c_data_fields(self) -> typing.List[str]:
+        return ['u32 tid;']
+
+    def bcc_c_callback_body(self) -> typing.List[str]:
+        return ['data.tid = bpf_get_current_pid_tgid() & 0xffffffff;']
+
+    def bcc_py_data_fields(self) -> typing.List[str]:
+        return ['("tid", ctypes.c_uint32),']
+
+    def bcc_py_callback_body(self) -> typing.List[str]:
+        return ['tid = event.tid']
+
+
 @render_context.UserScriptParser.register_var('comm', "comm = ''")
 class CommVar(render_context.UserScriptVar):
     def bcc_c_data_fields(self) -> typing.List[str]:
