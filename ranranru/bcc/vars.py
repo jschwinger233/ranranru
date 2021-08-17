@@ -50,6 +50,15 @@ class CommVar(render_context.UserScriptVar):
         return ['comm = event.comm.decode()']
 
 
+@render_context.UserScriptParser.register_var('_m', '''
+import collections
+_m = collections.defaultdict(int)
+        '''.strip())
+class GlobalMapVar(render_context.UserScriptVar):
+    def bcc_py_global(self) -> typing.List[str]:
+        return ['_m = {}']
+
+
 @render_context.UserScriptParser.register_var('stack', "stack = ''")
 class StackVar(render_context.UserScriptVar):
     def bcc_c_data_fields(self) -> typing.List[str]:

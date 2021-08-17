@@ -12,13 +12,16 @@ from . import sym
 class GlobalContext:
     bcc_py_imports: typing.List[str] = dataclasses.field(default_factory=list)
     bcc_c_headers: typing.List[str] = dataclasses.field(default_factory=list)
+    bcc_py_global: typing.List[str] = dataclasses.field(default_factory=list)
 
     def merge(self, ctx: 'GlobalContext') -> 'GlobalContext':
         new_imports = list(set(self.bcc_py_imports + ctx.bcc_py_imports))
         new_headers = list(set(self.bcc_c_headers + ctx.bcc_c_headers))
+        new_py_global = list(set(self.bcc_py_global + ctx.bcc_py_global))
         return dataclasses.replace(self,
                                    bcc_py_imports=new_imports,
-                                   bcc_c_headers=new_headers)
+                                   bcc_c_headers=new_headers,
+                                   bcc_py_global=new_py_global)
 
 
 @dataclasses.dataclass
@@ -33,7 +36,6 @@ class TracePointContext:
     bcc_c_callback_body: typing.List[str]
 
     bcc_py_data_fields: typing.List[str]
-    bcc_py_global: typing.List[str]
     bcc_py_callback_body: typing.List[str]
 
     attach_type: str = dataclasses.field(init=False)
@@ -74,13 +76,13 @@ class RenderContextManager:
         script_ctx = script_parser.parse()
         return GlobalContext(*[
             operator.getitem(script_ctx, item)
-            for item in ('bcc_py_imports', 'bcc_c_headers')
+            for item in ('bcc_py_imports', 'bcc_c_headers', 'bcc_py_global')
         ]), TracePointContext(
             self.tracee, self.uprobe, self.uprobe_regex, self.script, *[
                 operator.getitem(script_ctx, item)
                 for item in ('bcc_c_data_fields', 'bcc_c_global',
                              'bcc_c_callback_body', 'bcc_py_data_fields',
-                             'bcc_py_global', 'bcc_py_callback_body')
+                             'bcc_py_callback_body')
             ])
 
     def _setup_symbols(self):

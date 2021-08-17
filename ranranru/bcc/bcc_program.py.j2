@@ -45,6 +45,9 @@ b.attach_uprobe(
     fn_name='trace{{loop.index0}}')
 {% endfor %}
 
+{% for line in globals.bcc_py_global %}
+{{ line }}
+{% endfor %}
 
 {% for trace in tracepoints %}
 class Data{{loop.index0}}(ctypes.Structure):
@@ -53,10 +56,6 @@ class Data{{loop.index0}}(ctypes.Structure):
         {{ line }}
         {% endfor %}
     ]
-
-{% for line in trace.bcc_py_global %}
-{{ line }}
-{% endfor %}
 
 def callback{{loop.index0}}(_, data, __):
     event = ctypes.cast(data, ctypes.POINTER(Data{{loop.index0}})).contents
