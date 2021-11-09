@@ -61,33 +61,35 @@ class GlobalMapVar(render_context.UserScriptVar):
 
 @render_context.UserScriptParser.register_var('stack', "stack = ''")
 class StackVar(render_context.UserScriptVar):
+    index = -1
+
+    def __new__(cls, *args, **kws):
+        cls.index += 1
+        return super().__new__(cls)
+
     def bcc_c_data_fields(self) -> typing.List[str]:
         return ['int stack_id;']
 
     def bcc_c_global(self) -> typing.List[str]:
-        return ['BPF_STACK_TRACE(stack_traces, 128);']
+        return [f'BPF_STACK_TRACE(stack_trace{self.index}, 128);']
 
     def bcc_c_callback_body(self) -> typing.List[str]:
         return [
-            'data.stack_id = stack_traces.get_stackid(ctx, BPF_F_USER_STACK);'
+            f'data.stack_id = stack_trace{self.index}.get_stackid(ctx, BPF_F_USER_STACK);' # noqa
         ]
 
     def bcc_py_data_fields(self) -> typing.List[str]:
         return ['("stack_id", ctypes.c_int),']
 
-    def bcc_py_global(self) -> typing.List[str]:
+    def bcc_py_callback_body(self) -> typing.List[str]:
         sym_pid = self.script_parser.sym_pid
         return f'''
-def get_stack(stack_id):
-    syms = []
-    for addr in b.get_table('stack_traces').walk(stack_id):
-        sym = b.sym(addr, {sym_pid}, show_module=True, show_offset=True)
-        syms.append(sym.decode())
-    return '\\n'.join(syms)
-        '''.strip().split('\n')
-
-    def bcc_py_callback_body(self) -> typing.List[str]:
-        return ['stack = get_stack(event.stack_id)']
+syms = []
+for addr in b.get_table('stack_trace{self.index}').walk(event.stack_id):
+    sym = b.sym(addr, {sym_pid}, show_module=True, show_offset=True)
+    syms.append(sym.decode())
+stack = '\\n'.join(syms)
+    '''.strip().splitlines()
 
 
 @render_context.UserScriptParser.register_var('peek', '''

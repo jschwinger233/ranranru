@@ -17,7 +17,7 @@ class GlobalContext:
     def merge(self, ctx: 'GlobalContext') -> 'GlobalContext':
         new_imports = list(set(self.bcc_py_imports + ctx.bcc_py_imports))
         new_headers = list(set(self.bcc_c_headers + ctx.bcc_c_headers))
-        new_py_global = list(set(self.bcc_py_global + ctx.bcc_py_global))
+        new_py_global = list(self.bcc_py_global + ctx.bcc_py_global)
         return dataclasses.replace(self,
                                    bcc_py_imports=new_imports,
                                    bcc_c_headers=new_headers,
