@@ -12,7 +12,7 @@ REQUIREMENTS = [
 ]
 
 setup(name='ranranru',
-      python_requires='>=3.7',
+      python_requires='>=3.9',
       version=about['__version__'],
       packages=find_packages(),
       entry_points={'console_scripts': ['rrr=ranranru.main:main']},

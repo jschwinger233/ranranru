@@ -1,5 +1,3 @@
-from . import vars  # noqa
-from .renderer import Renderer
-from .process import Process
+from .render import render
 
-__all__ = ['Renderer', 'Process']
+__all__ = ['render']

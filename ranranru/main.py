@@ -1,84 +1,61 @@
-import sys
 import click
 
-from .trace import Trace
+from . import bcc
+from . import program
+
+
+def handle_extra_vars(ctx, param, value) -> dict:
+    if not value:
+        return {}
+
+    res = {}
+    for kv in value.split(','):
+        k, v = kv.split('=')
+        res[k] = v
+    return res
 
 
 @click.command(
     context_settings=dict(help_option_names=['-h', '--help']), )
-@click.option('-v',
-              '--verbose',
-              is_flag=True,
-              default=False,
-              show_default=True,
-              help='print BCC program before executing')
-@click.option('-vv',
-              '--very-verbose',
-              is_flag=True,
-              default=False,
-              show_default=True,
-              help='print BCC program with line numbers before executing')
-@click.option(
-    '-p',
-    '--python',
-    type=click.Path(exists=True, file_okay=True, dir_okay=False),
-    required=False,
-    default=sys.executable,
-    help='python interpreter to execute bcc program',
-)
+@click.option('-t',
+              '--tracee-binary',
+              required=True,
+              help='golang binary to trace')
+@click.option('-d',
+              '--tracee-debug-binary',
+              type=click.Path(exists=True, file_okay=True, dir_okay=False),
+              required=True,
+              help='golang binary with debug info')
 @click.option('-f',
               '--program-filename',
               type=click.Path(exists=True, file_okay=True, dir_okay=False),
               required=False,
               help='filename of program')
 @click.option(
-    '-t',
-    '--tracee-binary',
-    required=True,
-    help= 'golang binary to trace, can specify non-stripped binary by format [bin]:[sym-bin]'  # noqa
-)
-@click.option(
-    '--dry-run',
-    is_flag=True,
-    default=False,
-    help='don\'t execute bcc script, useful with -v',
-)
-@click.argument(
-    'program',
-    nargs=1,
-    default='',
-    required=False,
-)
+    '-e',
+    '--extra-vars',
+    help='extra variables to render bcc script, usage: -e k1=v1,k2=v2',
+    callback=handle_extra_vars)
+@click.argument('program-text', nargs=1, default='', required=False)
 def main(
-    verbose: bool,
-    very_verbose: bool,
-    python: str,
     tracee_binary: str,
+    tracee_debug_binary: str,
     program_filename: str,
-    dry_run: bool,
-    program: str,
+    program_text: str,
+    extra_vars: dict[str, str],
 ):
 
-    if not program_filename and not program:
+    if not program_filename and not program_text:
         raise click.BadParameter('either trace code or file is required')
 
     if program_filename:
         with open(program_filename) as f:
-            program += f.read().strip()
+            program_text += f.read().strip()
 
-    verbose_level = 1 if verbose else 0
-    verbose_level = 2 if very_verbose else verbose_level
+    extra_vars['tracee_binary'] = tracee_binary
 
-    tracee, tracee_sym, *_ = f'{tracee_binary}:'.split(':')
-
-    trace = Trace(
-        python=python,
-        program=program,
-        tracee=tracee,
-        tracee_sym=tracee_sym,
-        verbose_level=verbose_level,
-    )
-    trace.run(dry_run)
+    trace_uprobes = program.parse(program_text)
+    print(bcc.render(trace_uprobes, extra_vars))
 
 
 if __name__ == '__main__':
