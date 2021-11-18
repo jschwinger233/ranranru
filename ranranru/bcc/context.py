@@ -49,6 +49,7 @@ class Manager:
             )
             for define in uprobe.parsed_defines:
                 ctx.merge(convert(define, self.extra_vars))
+            ctx.py_callback += f'\n\n{uprobe.script}'
             ctxes.append(dataclasses.asdict(ctx))
         return {"uprobes": ctxes}
 
@@ -59,32 +60,32 @@ def convert(parsed_define, extra_ctx: dict) -> UprobeContext:
 
 
 @convert.register
-def _(__: program.ParsedPid, ___):
+def _(pid: program.ParsedPid, ___):
     return UprobeContext(
         c_data="u32 pid;",
         c_callback="data.pid = bpf_get_current_pid_tgid() >> 32;",
         py_data='("pid", ctypes.c_uint32),',
-        py_callback="pid = event.pid",
+        py_callback=f"{pid.varname} = event.pid",
     )
 
 
 @convert.register
-def _(__: program.ParsedTid, ___):
+def _(tid: program.ParsedTid, ___):
     return UprobeContext(
         c_data="u32 tid;",
         c_callback="data.tid = bpf_get_current_pid_tgid() & 0xffffffff;",
         py_data='("tid", ctypes.c_uint32),',
-        py_callback="tid = event.tid",
+        py_callback=f"{tid.varname} = event.tid",
     )
 
 
 @convert.register
-def _(__: program.ParsedComm, ___):
+def _(comm: program.ParsedComm, ___):
     return UprobeContext(
         c_data="char comm[16];",
         c_callback="bpf_get_current_comm(&data.comm, sizeof(data.comm));",
         py_data='("comm", ctypes.c_char * 16),',
-        py_callback="comm = event.comm.decode()",
+        py_callback=f"{comm.varname} = event.comm.decode()",
     )
 
 
@@ -102,10 +103,10 @@ def _(stack: program.ParsedStack, extra_ctx: dict):
         py_data='("stack_id", ctypes.c_int),',
         py_callback=f"""
 syms = []
-for addr in b.get_table('stack_trace{stack.idx}').walk(event.stack_id):
+for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
     sym = b.sym(addr, {sym_pid}, show_module=True, show_offset=True)
     syms.append(sym.decode())
-stack = '\\n'.join(syms)
+{stack.varname} = '\\n'.join(syms)
 """,
     )
 
@@ -146,7 +147,7 @@ def _(peek: program.ParsedPeek, __):
         return f'("peek{peek.idx}", {ctypes_field}),'
 
     def gen_py_callback() -> str:
-        return f"{peek.var} = event.peek{peek.idx}"
+        return f"{peek.varname} = event.peek{peek.idx}"
 
     return UprobeContext(
         c_data=gen_c_data(),

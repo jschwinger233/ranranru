@@ -6,7 +6,7 @@ import dataclasses
 class ParsedDefine:
     idx: int
     uprobe_idx: int
-    var: str
+    varname: str
     express: str
 
 
@@ -75,6 +75,9 @@ class Uprobe:
     parsed_defines: [ParsedDefine] = dataclasses.field(default_factory=list)
 
     def __post_init__(self):
+        self.address = self.address.strip()
+        self.defines = self.defines.strip()
+        self.script = self.script.strip()
         for idx, define in enumerate(self.defines.split(",")):
             var, express = define.split("=", 1)
             self.parsed_defines.append(

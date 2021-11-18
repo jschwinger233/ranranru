@@ -24,7 +24,6 @@ def handle_extra_vars(ctx, param, value) -> dict:
 @click.option('-d',
               '--tracee-debug-binary',
               type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              required=True,
               help='golang binary with debug info')
 @click.option('-f',
               '--program-filename',
