@@ -1,24 +1,26 @@
 import re
-from .uprobe import Uprobe
+from . import uprobe
 
 
 PAT_PROGRAM = re.compile(
     r"""
     (?P<addr> [^;]+);  # e.g. 0x1103c02;
     \s*
-    (?P<defines> [^;]+);  # e.g. n=peek($sp+0),stack=stack();
+    (?P<define> [^;]+);  # e.g. n=peek($sp+0),stack=stack();
     \s*
     \{(?P<script> .*?)(?=};)  # e.g. {print('called')};""",
     re.S | re.X,
 )
 
 
-def parse(program: str) -> [Uprobe]:
+def parse(program: str) -> [uprobe.Uprobe]:
     if not PAT_PROGRAM.search(program):
         raise ValueError("invalid program, pattern not match")
 
-    uprobes: [Uprobe] = []
+    uprobes: [uprobe.Uprobe] = []
     for idx, match in enumerate(PAT_PROGRAM.finditer(program)):
-        uprobes.append(Uprobe(idx, *match.group("addr", "defines", "script")))
+        uprobes.append(
+            uprobe.new(idx, *match.group("addr", "define", "script"))
+        )
 
     return uprobes

@@ -1,14 +1,15 @@
 import functools
 import dataclasses
 
+from .. import dwarf
 from .. import program
 
 
 @dataclasses.dataclass
 class UprobeContext:
     idx: int = None
-    tracee_binary: str = ''
-    address: str = ''
+    tracee_binary: str = ""
+    address: str = ""
 
     c_global: str = ""
     c_data: str = ""
@@ -31,12 +32,18 @@ class UprobeContext:
         self.c_data = f"{self.c_data}\n{other.c_data}"
         self.c_callback = f"{self.c_callback}\n{other.c_callback}"
         self.py_data = f"{self.py_data}\n{other.py_data}"
-        self.py_callback = f"{self.py_callback}\n{other.py_callback}" # noqa
+        self.py_callback = f"{self.py_callback}\n{other.py_callback}"  # noqa
 
 
 class Manager:
-    def __init__(self, uprobes: [program.Uprobe], extra_vars: dict):
+    def __init__(
+        self,
+        uprobes: [program.Uprobe],
+        dwarf_interpreter: dwarf.Interpreter,
+        extra_vars: dict,
+    ):
         self.uprobes = uprobes
+        self.dwarf_interpreter = dwarf_interpreter
         self.extra_vars = extra_vars
 
     def dump_context(self) -> str:
@@ -45,22 +52,22 @@ class Manager:
             ctx = UprobeContext(
                 idx=uprobe.idx,
                 tracee_binary=self.extra_vars["tracee_binary"],
-                address=uprobe.address,
+                address=uprobe.address.symbolize(self.dwarf_interpreter),
             )
-            for define in uprobe.parsed_defines:
+            for define in uprobe.defines:
                 ctx.merge(convert(define, self.extra_vars))
-            ctx.py_callback += f'\n\n{uprobe.script}'
+            ctx.py_callback += f"\n\n{uprobe.script}"
             ctxes.append(dataclasses.asdict(ctx))
         return {"uprobes": ctxes}
 
 
 @functools.singledispatch
-def convert(parsed_define, extra_ctx: dict) -> UprobeContext:
+def convert(define, extra_ctx: dict) -> UprobeContext:
     pass
 
 
 @convert.register
-def _(pid: program.ParsedPid, ___):
+def _(pid: program.PidDefine, ___):
     return UprobeContext(
         c_data="u32 pid;",
         c_callback="data.pid = bpf_get_current_pid_tgid() >> 32;",
@@ -70,7 +77,7 @@ def _(pid: program.ParsedPid, ___):
 
 
 @convert.register
-def _(tid: program.ParsedTid, ___):
+def _(tid: program.TidDefine, ___):
     return UprobeContext(
         c_data="u32 tid;",
         c_callback="data.tid = bpf_get_current_pid_tgid() & 0xffffffff;",
@@ -80,7 +87,7 @@ def _(tid: program.ParsedTid, ___):
 
 
 @convert.register
-def _(comm: program.ParsedComm, ___):
+def _(comm: program.CommDefine, ___):
     return UprobeContext(
         c_data="char comm[16];",
         c_callback="bpf_get_current_comm(&data.comm, sizeof(data.comm));",
@@ -90,7 +97,7 @@ def _(comm: program.ParsedComm, ___):
 
 
 @convert.register
-def _(stack: program.ParsedStack, extra_ctx: dict):
+def _(stack: program.StackDefine, extra_ctx: dict):
     try:
         sym_pid = extra_ctx["sym_pid"]
     except KeyError:
@@ -112,9 +119,9 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
 
 
 @convert.register
-def _(peek: program.ParsedPeek, __):
+def _(peek: program.PeekDefine, __):
     def gen_c_data() -> str:
-        return {"string": "char peek{}[128];", "int64": "u64 {};"}[
+        return {"char*": "char peek{}[128];", "int64": "u64 {};"}[
             peek.cast_type
         ].format(peek.idx)
 
@@ -133,7 +140,7 @@ def _(peek: program.ParsedPeek, __):
         r[0] = r[0].rstrip(",") + ";"
         if r[0] == "void;":
             del r[0]
-        cast_type = {"string": "char*", "int64": "u64"}[peek.cast_type]
+        cast_type = {"char*": "char*", "int64": "u64"}[peek.cast_type]
         r.append(
             f"bpf_probe_read(&data.peek{i}, sizeof(data.peek{i}), ({cast_type}*)((void*){pointer}{peek.offsets[-1]}));"  # noqa
         )
@@ -141,7 +148,7 @@ def _(peek: program.ParsedPeek, __):
 
     def gen_py_data() -> str:
         ctypes_field = {
-            "string": "ctypes.c_char * 128",
+            "char*": "ctypes.c_char * 128",
             "int64": "ctypes.c_int64",
         }[peek.cast_type]
         return f'("peek{peek.idx}", {ctypes_field}),'
