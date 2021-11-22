@@ -7,6 +7,9 @@ from . import program
 
 def handle_extra_vars(ctx, param, value) -> dict:
     res = {"tracee_binary": ctx.params["tracee_binary"]}
+    if not value:
+        return res
+
     for kv in value.split(","):
         k, v = kv.split("=")
         res[k] = v

@@ -75,18 +75,28 @@ class Address:
             raise ValueError(f"invalid uprobe address: {self.value}")
 
     def type(self) -> str:
-        if self.value.startswith("0x"):
-            return "hex"
-        elif self.value.count(":") == 1:
-            return "breakpoint"
+        if self.value.startswith("*"):  # *0x1234
+            return "address"
+        elif re.match(r".+?:\d+$", self.value):  # store/etcdv3/node.go:280
+            return "filename_lineno"
+        elif (
+            self.value
+        ):  # github.com/projecteru2/core/store/etcdv3.(*Mercury).doGetNodes
+            return "function"
         else:
             return ""
 
     def symbolize(self, dwarf_interpreter) -> str:
-        if self.type() == 'hex':
-            return self.value
-
-        return dwarf_interpreter.find_address(self.value)
+        if self.type() == "address":
+            return self.value[1:]
+        elif self.type() == "filename_lineno":
+            filename, lineno = self.value.rsplit(":", 1)
+            return dwarf_interpreter.find_address_by_filename_lineno(
+                filename,
+                int(lineno),
+            )
+        else:
+            return dwarf_interpreter.find_address_by_function(self.value)
 
 
 @dataclasses.dataclass
@@ -100,6 +110,8 @@ class Uprobe:
 def new(idx: int, address: str, define: str, script: str) -> Uprobe:
     defines: [Define] = []
     for i, d in enumerate(define.split(",")):
+        if '=' not in d:
+            continue
         var, express = d.split("=", 1)
         defines.append(new_define(i, idx, var, express))
     return Uprobe(

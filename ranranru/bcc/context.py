@@ -121,7 +121,7 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
 @convert.register
 def _(peek: program.PeekDefine, __):
     def gen_c_data() -> str:
-        return {"char*": "char peek{}[128];", "int64": "u64 {};"}[
+        return {"char*": "char peek{}[128];", "int64": "u64 peek{};"}[
             peek.cast_type
         ].format(peek.idx)
 
