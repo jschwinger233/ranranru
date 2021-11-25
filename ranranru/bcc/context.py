@@ -40,34 +40,36 @@ class Manager:
         self,
         uprobes: [program.Uprobe],
         dwarf_interpreter: dwarf.Interpreter,
-        extra_vars: dict,
+        extra_ctx: dict,
     ):
         self.uprobes = uprobes
         self.dwarf_interpreter = dwarf_interpreter
-        self.extra_vars = extra_vars
+        self.extra_ctx = extra_ctx
 
     def dump_context(self) -> str:
         ctxes = []
         for uprobe in self.uprobes:
             ctx = UprobeContext(
                 idx=uprobe.idx,
-                tracee_binary=self.extra_vars["tracee_binary"],
-                address=uprobe.address.symbolize(self.dwarf_interpreter),
+                tracee_binary=self.extra_ctx["tracee_binary"],
+                address=uprobe.address.interpret(self.dwarf_interpreter),
             )
             for define in uprobe.defines:
-                ctx.merge(convert(define, self.extra_vars))
+                ctx.merge(
+                    convert(define, self.dwarf_interpreter, self.extra_ctx)
+                )
             ctx.py_callback += f"\n\n{uprobe.script}"
             ctxes.append(dataclasses.asdict(ctx))
         return {"uprobes": ctxes}
 
 
 @functools.singledispatch
-def convert(define, extra_ctx: dict) -> UprobeContext:
+def convert(define, interpreter, extra_ctx: dict) -> UprobeContext:
     pass
 
 
 @convert.register
-def _(pid: program.PidDefine, ___):
+def _(pid: program.PidDefine, __, ___):
     return UprobeContext(
         c_data="u32 pid;",
         c_callback="data.pid = bpf_get_current_pid_tgid() >> 32;",
@@ -77,7 +79,7 @@ def _(pid: program.PidDefine, ___):
 
 
 @convert.register
-def _(tid: program.TidDefine, ___):
+def _(tid: program.TidDefine, __, ___):
     return UprobeContext(
         c_data="u32 tid;",
         c_callback="data.tid = bpf_get_current_pid_tgid() & 0xffffffff;",
@@ -87,7 +89,7 @@ def _(tid: program.TidDefine, ___):
 
 
 @convert.register
-def _(comm: program.CommDefine, ___):
+def _(comm: program.CommDefine, __, ___):
     return UprobeContext(
         c_data="char comm[16];",
         c_callback="bpf_get_current_comm(&data.comm, sizeof(data.comm));",
@@ -97,7 +99,7 @@ def _(comm: program.CommDefine, ___):
 
 
 @convert.register
-def _(stack: program.StackDefine, extra_ctx: dict):
+def _(stack: program.StackDefine, __, extra_ctx: dict):
     try:
         sym_pid = extra_ctx["sym_pid"]
     except KeyError:
@@ -119,38 +121,47 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
 
 
 @convert.register
-def _(peek: program.PeekDefine, __):
+def _(peek: program.PeekDefine, interpreter, __):
+    reg, *ops, cast_type = peek.interpret(interpreter)
+
     def gen_c_data() -> str:
-        return {"char*": "char peek{}[128];", "int64": "u64 peek{};"}[
-            peek.cast_type
+        return {"str": "char peek{}[128];", "int64": "u64 peek{};"}[
+            cast_type
         ].format(peek.idx)
 
     def gen_c_callback() -> str:
-        r = []
-        r.append("void")
-        pointer = f"ctx->{peek.reg}"
-        i = peek.idx
-        for j, off in enumerate(peek.offsets[:-1]):
-            r[0] += f" *a{i}{j},"
+        r = ["void"]
+        pointer, i = f"ctx->{reg}", peek.idx
+        for j, op in enumerate(ops[:-1]):
+            if op == "*":
+                r[0] += f" *a{i}{j}, "
+                r.append(
+                    f"bpf_probe_read(&a{i}{j}, sizeof(a{i}{j}), (void*){pointer});"  # noqa
+                )
+                pointer = f"a{i}{j}"
+
+            elif op.startswith(("+", "-")):
+                pointer += op
+
+        if ops and ops[-1] == "*":
+            r[0] += f" *a{i}{j+1},"
             r.append(
-                f"bpf_probe_read(&a{i}{j}, sizeof(a{i}{j}), (void**)((void*){pointer}{off}));"  # noqa
+                f"bpf_probe_read(&data.peek{i}, sizeof(data.peek{i}), (void*){pointer});"  # noqa
             )
-            pointer = f"a{i}{j}"
+
+        else:
+            r.append(f"data.peek{i} = {pointer};")
 
         r[0] = r[0].rstrip(",") + ";"
         if r[0] == "void;":
             del r[0]
-        cast_type = {"char*": "char*", "int64": "u64"}[peek.cast_type]
-        r.append(
-            f"bpf_probe_read(&data.peek{i}, sizeof(data.peek{i}), ({cast_type}*)((void*){pointer}{peek.offsets[-1]}));"  # noqa
-        )
         return "\n".join(r)
 
     def gen_py_data() -> str:
         ctypes_field = {
-            "char*": "ctypes.c_char * 128",
+            "str": "ctypes.c_char * 128",
             "int64": "ctypes.c_int64",
-        }[peek.cast_type]
+        }[cast_type]
         return f'("peek{peek.idx}", {ctypes_field}),'
 
     def gen_py_callback() -> str:

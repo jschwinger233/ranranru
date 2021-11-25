@@ -62,6 +62,7 @@ def handle_program_text(ctx, param, value) -> str:
     help="extra variables to render bcc script, usage: -e k1=v1,k2=v2",
     callback=handle_extra_vars,
 )
+@click.option("-o", "--output", help="output filename", default="trace.bcc.py")
 @click.argument(
     "program-text",
     nargs=1,
@@ -75,13 +76,18 @@ def main(
     program_filename: str,  # preprocessed
     program_text: str,
     extra_vars: dict[str, str],
+    output: str,
 ):
 
     trace_uprobes = program.parse(program_text)
     dwarf_interpreter = dwarf.Interpreter(
         tracee_debug_binary, extra_vars.pop("dwarf_path_prefix", "")
     )
-    print(bcc.render(trace_uprobes, dwarf_interpreter, extra_vars))
+    print(
+        bcc.render(trace_uprobes, dwarf_interpreter, extra_vars),
+        file=open(output, "w"),
+    )
+    print(f'generated {output}')
 
 
 if __name__ == "__main__":
