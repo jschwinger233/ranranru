@@ -127,7 +127,7 @@ class Address:
                 int(lineno),
             )
         else:
-            return dwarf_interpreter.find_address_by_function(self.value)
+            return dwarf_interpreter.find_address_by_function_name(self.value)
 
 
 @dataclasses.dataclass
