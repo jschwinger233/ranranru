@@ -51,7 +51,7 @@ class Manager:
         for uprobe in self.uprobes:
             ctx = UprobeContext(
                 idx=uprobe.idx,
-                tracee_binary=self.extra_ctx["tracee_binary"],
+                tracee_binary=self.extra_ctx["real_target"],
                 address=uprobe.address.interpret(self.dwarf_interpreter),
             )
             for define in uprobe.defines:
