@@ -1,7 +1,7 @@
 import click
 
 from . import bcc
-from . import dwarf
+from . import elf
 from . import program
 
 
@@ -58,23 +58,18 @@ def main(
 
     extra_vars.setdefault("real_target", target)
     trace_uprobes = program.parse(program_text)
-    dwarf_interpreter = dwarf.Interpreter(target)
+    elf_interpreter = elf.Interpreter(target)
     print(
-        bcc.render(trace_uprobes, dwarf_interpreter, extra_vars),
+        bcc.render(trace_uprobes, elf_interpreter, extra_vars),
         file=open(output, "w"),
     )
     print(f"generated {output}")
 
 
-@main.group()
-def pipe():
-    pass
-
-
-from .pipe import register # noqa
-
-register(pipe)
-
-
 if __name__ == "__main__":
-    main()
+    # main()
+    i = elf.Interpreter(
+        "/home/gray/Dropbox/mac.local/Documents/src/github.com/projecteru2/core/core"
+    )
+    print(i.find_var_location("0x0000000000fc37c0", "kvs"))
+    print(i.find_var_location("0xfc1260", "opts"))

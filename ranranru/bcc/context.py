@@ -1,7 +1,7 @@
 import functools
 import dataclasses
 
-from .. import dwarf
+from .. import elf
 from .. import program
 
 
@@ -39,11 +39,11 @@ class Manager:
     def __init__(
         self,
         uprobes: [program.Uprobe],
-        dwarf_interpreter: dwarf.Interpreter,
+        elf_interpreter: elf.Interpreter,
         extra_ctx: dict,
     ):
         self.uprobes = uprobes
-        self.dwarf_interpreter = dwarf_interpreter
+        self.elf_interpreter = elf_interpreter
         self.extra_ctx = extra_ctx
 
     def dump_context(self) -> str:
@@ -52,11 +52,11 @@ class Manager:
             ctx = UprobeContext(
                 idx=uprobe.idx,
                 tracee_binary=self.extra_ctx["real_target"],
-                address=uprobe.address.interpret(self.dwarf_interpreter),
+                address=uprobe.address.interpret(self.elf_interpreter),
             )
             for define in uprobe.defines:
                 ctx.merge(
-                    convert(define, self.dwarf_interpreter, self.extra_ctx)
+                    convert(define, self.elf_interpreter, self.extra_ctx)
                 )
             ctx.py_callback += f"\n\n{uprobe.script}"
             ctxes.append(dataclasses.asdict(ctx))

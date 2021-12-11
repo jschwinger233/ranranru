@@ -124,7 +124,7 @@ class Address:
             filename, lineno = self.value.rsplit(":", 1)
             return dwarf_interpreter.find_address_by_filename_lineno(
                 filename,
-                int(lineno),
+                lineno,
             )
         else:
             return dwarf_interpreter.find_address_by_function_name(self.value)

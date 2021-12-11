@@ -1,14 +1,14 @@
 import os
 import jinja2
 
-from .. import dwarf
+from .. import elf
 from .. import program
 from . import context
 
 
 def render(
     uprobes: [program.Uprobe],
-    dwarf_interpreter: dwarf.Interpreter,
+    elf_interpreter: elf.Interpreter,
     extra_vars: dict,
 ) -> str:
     tmpl = jinja2.Template(
@@ -19,5 +19,5 @@ def render(
         lstrip_blocks=True,
     )
 
-    context_manager = context.Manager(uprobes, dwarf_interpreter, extra_vars)
+    context_manager = context.Manager(uprobes, elf_interpreter, extra_vars)
     return tmpl.render(**context_manager.dump_context())
