@@ -1,7 +1,7 @@
 from .utils import yield_elf_lines
 
 
-def find_location_expr(
+def find_location_desc(
     dwarf_filename: str, location_addr: str, uprobe_addr: str
 ) -> str:
     location_addr = location_addr.removeprefix('0x').encode()
@@ -15,4 +15,4 @@ def find_location_expr(
         if on:
             _, start, end, expr = line.decode().split(maxsplit=3)
             if int(start, 16) <= uprobe_addr < int(end, 16):
-                return expr
+                return expr[1:-1]
