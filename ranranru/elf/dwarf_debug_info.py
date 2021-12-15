@@ -4,6 +4,7 @@ from .utils import yield_elf_lines
 
 PAT_DW_AT_location = re.compile(r"DW_AT_location\s*:\s*(.*)")
 PAT_DW_OP = re.compile(r"\((.*)\)")
+PAT_NODE = re.compile(r'^<(\d)>')
 
 
 @dataclasses.dataclass
@@ -78,8 +79,11 @@ def find_subprogram(  # noqa
         # all below are within a DW_TAG_subprogram
         line = line.decode()
 
-        if "DW_TAG_" in line and not line.startswith("<2>") and subprogram:
-            return subprogram
+        if subprogram:
+            m = PAT_NODE.match(line)
+            import pdb; pdb.set_trace()
+            if m and m.group(1) != '2':
+                return subprogram
 
         if "DW_AT_name" in line and not param:
             name = line.split()[-1]

@@ -1,4 +1,5 @@
 import click
+from black import format_str, FileMode
 
 from . import bcc
 from . import elf
@@ -60,7 +61,10 @@ def main(
     trace_uprobes = program.parse(program_text)
     elf_interpreter = elf.Interpreter(target)
     print(
-        bcc.render(trace_uprobes, elf_interpreter, extra_vars),
+        format_str(
+            bcc.render(trace_uprobes, elf_interpreter, extra_vars),
+            mode=FileMode(),
+        ),
         file=open(output, "w"),
     )
     print(f"generated {output}")
@@ -71,5 +75,9 @@ if __name__ == "__main__":
     i = elf.Interpreter(
         "/home/gray/Dropbox/mac.local/Documents/src/github.com/projecteru2/core/core"
     )
-    print(i.parse_expr_location("0x0000000000fd6cee", "kvs", ['array', 'Key', 'array']))
-    #print(i.parse_expr_location("0xfc1260", "opts", []))
+    print(
+        i.parse_expr_location(
+            "0x0000000000fd6cee", "kvs", ["array", "Key", "array"]
+        )
+    )
+    # print(i.parse_expr_location("0xfc1260", "opts", []))

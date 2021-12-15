@@ -38,7 +38,7 @@ class PeekDefine(Define):
     pat_expression = re.compile(r"\$peek\((.*)\)")  # $peek($sp(str))
     pat_cooked_reg = re.compile(r"^\$(\w+)")  # $sp
     pat_cooked_ops = re.compile(r"\+\d+|\*")  # +1**+2+3*
-    pat_cooked_cast = re.compile(r"\((.*)\)$")
+    pat_cast = re.compile(r"\((.*)\)$")
 
     def __post_init__(self):
         match = self.pat_expression.match(self.express)
@@ -47,12 +47,9 @@ class PeekDefine(Define):
         self.operations = match.group(1)
 
     def type(self) -> str:
-        if (
-            self.pat_cooked_reg.match(self.operations)
-            and self.pat_cooked_cast.match(
-                self.pat_cooked_ops.sub(
-                    "", self.pat_cooked_reg.sub("", self.operations)
-                )
+        if self.pat_cooked_reg.match(self.operations) and self.pat_cast.match(
+            self.pat_cooked_ops.sub(
+                "", self.pat_cooked_reg.sub("", self.operations)
             )
         ):
             return "cooked"
@@ -60,18 +57,25 @@ class PeekDefine(Define):
             return "raw"
 
     def interpret(
-        self, dwarf_interpreter
+        self, uprobe_addr: str, dwarf_interpreter
     ) -> [str]:  # [sp, +1, *, *, cast_type, *, cast_type]
         if self.type() == "cooked":
             return self.interpret_cooked(self.operations)
         elif self.type() == "raw":
-            ...
+            cast = self.pat_cast.search(self.operations).group(0)
+            parts = self.operations.removesuffix(cast).split(".")
+            cooked = dwarf_interpreter.find_expr_location(
+                uprobe_addr, parts[0], parts[1:]
+            )
+            if cast == "(str)":
+                cooked += "*"
+            return self.interpret_cooked(cooked + cast)
 
     def interpret_cooked(self, exp: str) -> [str]:
         return (
             self.pat_cooked_reg.findall(exp)
             + self.pat_cooked_ops.findall(exp)
-            + self.pat_cooked_cast.findall(exp)
+            + self.pat_cast.findall(exp)
         )
 
 

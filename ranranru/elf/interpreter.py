@@ -10,7 +10,7 @@ class Interpreter:
     def __init__(self, dwarf_filename: str):
         self.dwarf_filename = dwarf_filename
 
-    def parse_address_by_filename_lineno(
+    def find_address_by_filename_lineno(
         self, filename_suffix: str, lineno: str
     ) -> str:
         candidates = dwarf_debug_line.findall_filenames(
@@ -46,6 +46,7 @@ class Interpreter:
         subprogram = dwarf_debug_info.find_subprogram(
             self.dwarf_filename, uprobe_addr
         )
+        import pdb; pdb.set_trace()
         param = subprogram.get_param(varname)
         if param.location_type == "location_list":
             desc = dwarf_debug_loc.find_location_desc(
@@ -61,7 +62,7 @@ class Interpreter:
         ).replace("rsp", "$sp")
         return dwarf_location_desc.parse(desc, cfa), param.type_addr
 
-    def parse_expr_location(
+    def find_expr_location(
         self, uprobe_addr: str, varname: str, members: [str]
     ) -> str:
         loc_expr, type_addr = self.parse_var(uprobe_addr, varname)

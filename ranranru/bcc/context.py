@@ -56,7 +56,7 @@ class Manager:
             )
             for define in uprobe.defines:
                 ctx.merge(
-                    convert(define, self.elf_interpreter, self.extra_ctx)
+                    convert(define, self.elf_interpreter, ctx, self.extra_ctx)
                 )
             ctx.py_callback += f"\n\n{uprobe.script}"
             ctxes.append(dataclasses.asdict(ctx))
@@ -64,12 +64,14 @@ class Manager:
 
 
 @functools.singledispatch
-def convert(define, interpreter, extra_ctx: dict) -> UprobeContext:
+def convert(
+    define, interpreter, ctx: UprobeContext, extra_ctx: dict
+) -> UprobeContext:
     pass
 
 
 @convert.register
-def _(pid: program.PidDefine, __, ___):
+def _(pid: program.PidDefine, __, ___, ____):
     return UprobeContext(
         c_data="u32 pid;",
         c_callback="data.pid = bpf_get_current_pid_tgid() >> 32;",
@@ -79,7 +81,7 @@ def _(pid: program.PidDefine, __, ___):
 
 
 @convert.register
-def _(tid: program.TidDefine, __, ___):
+def _(tid: program.TidDefine, __, ___, ____):
     return UprobeContext(
         c_data="u32 tid;",
         c_callback="data.tid = bpf_get_current_pid_tgid() & 0xffffffff;",
@@ -89,7 +91,7 @@ def _(tid: program.TidDefine, __, ___):
 
 
 @convert.register
-def _(comm: program.CommDefine, __, ___):
+def _(comm: program.CommDefine, __, ___, ____):
     return UprobeContext(
         c_data="char comm[16];",
         c_callback="bpf_get_current_comm(&data.comm, sizeof(data.comm));",
@@ -99,7 +101,7 @@ def _(comm: program.CommDefine, __, ___):
 
 
 @convert.register
-def _(stack: program.StackDefine, __, extra_ctx: dict):
+def _(stack: program.StackDefine, __, ___, extra_ctx: dict):
     try:
         sym_pid = extra_ctx["sym_pid"]
     except KeyError:
@@ -121,8 +123,8 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
 
 
 @convert.register
-def _(peek: program.PeekDefine, interpreter, __):
-    reg, *ops, cast_type = peek.interpret(interpreter)
+def _(peek: program.PeekDefine, interpreter, ctx, __):
+    reg, *ops, cast_type = peek.interpret(ctx.address, interpreter)
 
     def gen_c_data() -> str:
         return {"str": "char peek{}[128];", "int64": "u64 peek{};"}[
@@ -144,7 +146,6 @@ def _(peek: program.PeekDefine, interpreter, __):
                 pointer += op
 
         if ops and ops[-1] == "*":
-            r[0] += f" *a{i}{j+1},"
             r.append(
                 f"bpf_probe_read(&data.peek{i}, sizeof(data.peek{i}), (void*){pointer});"  # noqa
             )
@@ -152,7 +153,7 @@ def _(peek: program.PeekDefine, interpreter, __):
         else:
             r.append(f"data.peek{i} = {pointer};")
 
-        r[0] = r[0].rstrip(",") + ";"
+        r[0] = r[0].rstrip(", ") + ";"
         if r[0] == "void;":
             del r[0]
         return "\n".join(r)
