@@ -46,7 +46,6 @@ class Interpreter:
         subprogram = dwarf_debug_info.find_subprogram(
             self.dwarf_filename, uprobe_addr
         )
-        import pdb; pdb.set_trace()
         param = subprogram.get_param(varname)
         if param.location_type == "location_list":
             desc = dwarf_debug_loc.find_location_desc(

@@ -44,6 +44,8 @@ def parse(desc: str, cfa: str) -> str:
             res.append(parse_op_fbreg(d, cfa))
         elif "DW_OP_piece" in d:
             res.append(";")
+        elif "DW_OP_call_frame_cfa" in d:
+            res.append(cfa + "*")
         else:
             raise ValueError(f"invalid dwarf location description: {d}")
     return "".join(res)

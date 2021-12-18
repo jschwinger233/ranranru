@@ -4,7 +4,7 @@ from .utils import yield_elf_lines
 
 PAT_DW_AT_location = re.compile(r"DW_AT_location\s*:\s*(.*)")
 PAT_DW_OP = re.compile(r"\((.*)\)")
-PAT_NODE = re.compile(r'^<(\d)>')
+PAT_NODE = re.compile(r"^<(\d)>.*?(DW_TAG_\w+)")
 
 
 @dataclasses.dataclass
@@ -66,67 +66,59 @@ def find_subprogram(  # noqa
     dwarf_filename: str, uprobe_addr: str
 ) -> Subprogram:
     uprobe_addr = int(uprobe_addr, 16)
-    on_sub = False
     subprogram = param = None
+    ctx: [(int, str)] = [(-1, "")]
     for line in yield_elf_lines(dwarf_filename, "Wi"):
-        if b"DW_TAG_subprogram" in line:
-            on_sub = True
+        if b"DW_TAG_" in line:
+            m = PAT_NODE.match(line.decode())
+            no, tag = int(m.group(1)), m.group(2)
+            while ctx and ctx[-1][0] >= no:
+                if ctx[-1][1] == "DW_TAG_subprogram" and subprogram:
+                    return subprogram
+                if ctx[-1][1] == "DW_TAG_formal_parameter" and param:
+                    subprogram.params.append(param)
+                    param = None
+                ctx.pop()
+            if tag == "DW_TAG_formal_parameter" and subprogram:
+                param = Parameter()
+            ctx.append((no, tag))
             continue
 
-        if not on_sub:
+        if b"DW_AT_name" in line:
+            if ctx[-1][1] == "DW_TAG_subprogram":
+                subprogram_name = line.decode().split()[-1]
+            elif ctx[-1][1] == "DW_TAG_formal_parameter" and param:
+                param.name = line.decode().split()[-1]
             continue
 
-        # all below are within a DW_TAG_subprogram
-        line = line.decode()
-
-        if subprogram:
-            m = PAT_NODE.match(line)
-            import pdb; pdb.set_trace()
-            if m and m.group(1) != '2':
-                return subprogram
-
-        if "DW_AT_name" in line and not param:
-            name = line.split()[-1]
+        if b"DW_AT_low_pc" in line and ctx[-1][1] == "DW_TAG_subprogram":
+            low_pc = int(line.decode().split()[-1], 16)
             continue
 
-        if "DW_AT_low_pc" in line:
-            low_pc = int(line.split()[-1], 16)
-            continue
-
-        if "DW_AT_high_pc" in line:
-            high_pc = int(line.split()[-1], 16)
+        if b"DW_AT_high_pc" in line and ctx[-1][1] == "DW_TAG_subprogram":
+            high_pc = int(line.decode().split()[-1], 16)
             if low_pc <= uprobe_addr < high_pc:
-                subprogram = Subprogram(name, f"{low_pc:x}", f"{high_pc:x}")
-            else:
-                on_sub = False
+                subprogram = Subprogram(
+                    subprogram_name, f"{low_pc:x}", f"{high_pc:x}"
+                )
             continue
 
-        if not subprogram:
+        if (
+            b"DW_AT_type" in line
+            and ctx[-1][1] == "DW_TAG_formal_parameter"
+            and param
+        ):
+            param.type_addr = line.decode().split()[-1].strip("<>")
             continue
 
-        if param and line.startswith(("<1>", "<2>", "<3>")):
-            subprogram.params.append(param)
-            param = None
-
-        if "DW_TAG_formal_parameter" in line:
-            param = Parameter()
-            continue
-
-        if not param:
-            continue
-
-        # all below are within a DW_TAG_formal_parameter
-
-        if "DW_AT_name" in line:
-            param.name = line.split()[-1]
-            continue
-
-        if "DW_AT_type" in line:
-            param.type_addr = line.split()[-1].strip("<>")
-            continue
-
-        if "DW_AT_location" in line:
-            param.dw_at_location = PAT_DW_AT_location.search(line).group(1)
+        if (
+            b"DW_AT_location" in line
+            and ctx[-1][1] == "DW_TAG_formal_parameter"
+            and param
+        ):
+            param.dw_at_location = PAT_DW_AT_location.search(
+                line.decode()
+            ).group(1)
             continue
 
 
