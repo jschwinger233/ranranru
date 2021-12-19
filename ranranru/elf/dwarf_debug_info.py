@@ -69,8 +69,7 @@ def find_subprogram(  # noqa
     subprogram = param = None
     ctx: [(int, str)] = [(-1, "")]
     for line in yield_elf_lines(dwarf_filename, "Wi"):
-        if b"DW_TAG_" in line:
-            m = PAT_NODE.match(line.decode())
+        if b"DW_TAG_" in line and (m := PAT_NODE.match(line.decode())):
             no, tag = int(m.group(1)), m.group(2)
             while ctx and ctx[-1][0] >= no:
                 if ctx[-1][1] == "DW_TAG_subprogram" and subprogram:
