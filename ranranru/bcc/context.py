@@ -27,12 +27,12 @@ class UprobeContext:
         self.py_data = self.py_data.strip()
         self.py_callback = self.py_callback.strip()
 
-    def merge(self, other: "UprobeContext") -> "UprobeContext":
-        self.c_global = f"{self.c_global}\n{other.c_global}"
-        self.c_data = f"{self.c_data}\n{other.c_data}"
-        self.c_callback = f"{self.c_callback}\n{other.c_callback}"
-        self.py_data = f"{self.py_data}\n{other.py_data}"
-        self.py_callback = f"{self.py_callback}\n{other.py_callback}"  # noqa
+    def merge(self, other: "UprobeContext"):
+        self.c_global = f"{self.c_global}\n{other.c_global}".rstrip()
+        self.c_data = f"{self.c_data}\n{other.c_data}".rstrip()
+        self.c_callback = f"{self.c_callback}\n{other.c_callback}".rstrip()
+        self.py_data = f"{self.py_data}\n{other.py_data}".rstrip()
+        self.py_callback = f"{self.py_callback}\n{other.py_callback}".rstrip()  # noqa
 
 
 class Manager:
@@ -134,7 +134,9 @@ def _(peek: program.PeekDefine, interpreter, ctx, __):
     casts = {
         "str": Cast("char peek{}[128];", "ctypes.c_char * 128"),
         "int64": Cast("u64 peek{};", "ctypes.c_int64"),
+        "int32": Cast("u32 peek{};", "ctypes.c_int32"),
         "int8": Cast("u8 peek{};", "ctypes.c_int8"),
+        "float64": Cast("double peek{};", "ctypes.c_double"),
     }
 
     def gen_c_data() -> str:

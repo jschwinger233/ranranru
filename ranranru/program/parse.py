@@ -6,7 +6,7 @@ PAT_PROGRAM = re.compile(
     r"""
     (?P<addr> [^;]+);  # e.g. 0x1103c02;
     \s*
-    (?P<define> [^;]*);  # e.g. n=peek($sp+0),stack=stack();
+    (?P<define> [^;]*);  # e.g. n=$peek($sp+0),stack=$stack();
     \s*
     \{(?P<script> .*?)(?=};)  # e.g. {print('called')};""",
     re.S | re.X,
