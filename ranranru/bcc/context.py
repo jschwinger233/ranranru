@@ -126,10 +126,19 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
 def _(peek: program.PeekDefine, interpreter, ctx, __):
     reg, *ops, cast_type = peek.interpret(ctx.address, interpreter)
 
+    @dataclasses.dataclass
+    class Cast:
+        c_data: str
+        py_data: str
+
+    casts = {
+        "str": Cast("char peek{}[128];", "ctypes.c_char * 128"),
+        "int64": Cast("u64 peek{};", "ctypes.c_int64"),
+        "int8": Cast("u8 peek{};", "ctypes.c_int8"),
+    }
+
     def gen_c_data() -> str:
-        return {"str": "char peek{}[128];", "int64": "u64 peek{};"}[
-            cast_type
-        ].format(peek.idx)
+        return casts[cast_type].c_data.format(peek.idx)
 
     def gen_c_callback() -> str:
         r = ["void"]
@@ -159,10 +168,7 @@ def _(peek: program.PeekDefine, interpreter, ctx, __):
         return "\n".join(r)
 
     def gen_py_data() -> str:
-        ctypes_field = {
-            "str": "ctypes.c_char * 128",
-            "int64": "ctypes.c_int64",
-        }[cast_type]
+        ctypes_field = casts[cast_type].py_data
         return f'("peek{peek.idx}", {ctypes_field}),'
 
     def gen_py_callback() -> str:
