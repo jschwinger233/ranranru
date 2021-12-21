@@ -67,7 +67,7 @@ class PeekDefine(Define):
             cooked = dwarf_interpreter.find_expr_location(
                 uprobe_addr, parts[0], parts[1:]
             )
-            if cast == "(str)":
+            if cast.startswith('(char'):
                 cooked += "*"
             return self.interpret_cooked(cooked + cast)
 

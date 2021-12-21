@@ -32,7 +32,9 @@ class UprobeContext:
         self.c_data = f"{self.c_data}\n{other.c_data}".rstrip()
         self.c_callback = f"{self.c_callback}\n{other.c_callback}".rstrip()
         self.py_data = f"{self.py_data}\n{other.py_data}".rstrip()
-        self.py_callback = f"{self.py_callback}\n{other.py_callback}".rstrip()  # noqa
+        self.py_callback = (
+            f"{self.py_callback}\n{other.py_callback}".rstrip()
+        )  # noqa
 
 
 class Manager:
@@ -122,25 +124,96 @@ for addr in b.get_table('stack_trace{stack.uprobe_idx}').walk(event.stack_id):
     )
 
 
+@dataclasses.dataclass
+class CastType:
+    t: str
+
+    @classmethod
+    def find_specific(cls, t):
+        for subcls in cls.__subclasses__():
+            if subcls.match(t):
+                return subcls(t)
+        raise ValueError(f"invalid peek type {t}")
+
+    @classmethod
+    def match(cls, t) -> bool:
+        raise NotImplementedError(f"match method not implemented: {cls}")
+
+    @property
+    def c_data(self) -> str:
+        raise NotImplementedError(
+            f"c_data property not implemented: {__class__}"
+        )
+
+    @property
+    def py_data(self) -> str:
+        raise NotImplementedError(
+            f"py_data property not implemented: {__class__}"
+        )
+
+
+@dataclasses.dataclass
+class Char(CastType):
+    @classmethod
+    def match(cls, t) -> bool:
+        return t.startswith("char")
+
+    def __post_init__(self):
+        self.n = self.t.removeprefix("char")
+
+    @property
+    def c_data(self):
+        return f"char peek{{}}[{self.n}];"
+
+    @property
+    def py_data(self):
+        return f"ctypes.c_char * {self.n}"
+
+
+@dataclasses.dataclass
+class Int(CastType):
+    @classmethod
+    def match(cls, t) -> bool:
+        return "int" in t
+
+    def __post_init__(self):
+        self.u = "u" if self.t.startswith("u") else ""
+        self.n = self.t.removeprefix("u").removeprefix("int")
+
+    @property
+    def c_data(self):
+        return f"u{self.n} peek{{}};"
+
+    @property
+    def py_data(self):
+        return f"ctypes.c_{self.u}int{self.n}"
+
+
+@dataclasses.dataclass
+class Float(CastType):
+    @classmethod
+    def match(cls, t) -> bool:
+        return t.startswith("float")
+
+    def __post_init__(self):
+        if self.t.removeprefix("float") != "64":
+            raise NotImplementedError(f"unsupported float: {self.t}")
+
+    @property
+    def c_data(self):
+        return "double peek{};"
+
+    @property
+    def py_data(self):
+        return "ctypes.c_double"
+
+
 @convert.register
 def _(peek: program.PeekDefine, interpreter, ctx, __):
     reg, *ops, cast_type = peek.interpret(ctx.address, interpreter)
 
-    @dataclasses.dataclass
-    class Cast:
-        c_data: str
-        py_data: str
-
-    casts = {
-        "str": Cast("char peek{}[128];", "ctypes.c_char * 128"),
-        "int64": Cast("u64 peek{};", "ctypes.c_int64"),
-        "int32": Cast("u32 peek{};", "ctypes.c_int32"),
-        "int8": Cast("u8 peek{};", "ctypes.c_int8"),
-        "float64": Cast("double peek{};", "ctypes.c_double"),
-    }
-
     def gen_c_data() -> str:
-        return casts[cast_type].c_data.format(peek.idx)
+        return CastType.find_specific(cast_type).c_data.format(peek.idx)
 
     def gen_c_callback() -> str:
         r = ["void"]
@@ -170,7 +243,7 @@ def _(peek: program.PeekDefine, interpreter, ctx, __):
         return "\n".join(r)
 
     def gen_py_data() -> str:
-        ctypes_field = casts[cast_type].py_data
+        ctypes_field = CastType.find_specific(cast_type).py_data
         return f'("peek{peek.idx}", {ctypes_field}),'
 
     def gen_py_callback() -> str:
