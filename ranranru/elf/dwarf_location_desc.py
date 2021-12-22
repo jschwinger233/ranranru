@@ -2,7 +2,7 @@ import re
 
 
 PAT_OP_REG = re.compile(r"DW_OP_reg.*?\((.*?)\)")
-PAT_OP_FBREG = re.compile(r"DW_OP_fbreg:\s*(\w+)")
+PAT_OP_FBREG = re.compile(r"DW_OP_fbreg:\s*(-?\w+)")
 
 
 def parse_op_reg(desc: str) -> str:
@@ -29,7 +29,10 @@ def parse_op_reg(desc: str) -> str:
 
 
 def parse_op_fbreg(desc: str, cfa: str) -> str:
-    offset = PAT_OP_FBREG.search(desc).group(1)
+    try:
+        offset = PAT_OP_FBREG.search(desc).group(1)
+    except:
+        import pdb; pdb.set_trace()
     if offset.isdigit():
         offset = f"+{offset}"
     return f"{cfa}{offset}*"

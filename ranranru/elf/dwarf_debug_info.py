@@ -39,6 +39,7 @@ class Subprogram:
         for param in self.params:
             if param.name == varname:
                 return param
+        raise ValueError(f"param not found: {varname}")
 
 
 @dataclasses.dataclass
@@ -74,11 +75,18 @@ def find_subprogram(  # noqa
             while ctx and ctx[-1][0] >= no:
                 if ctx[-1][1] == "DW_TAG_subprogram" and subprogram:
                     return subprogram
-                if ctx[-1][1] == "DW_TAG_formal_parameter" and param:
+                if (
+                    ctx[-1][1]
+                    in {"DW_TAG_formal_parameter", "DW_TAG_variable"}
+                    and param
+                ):
                     subprogram.params.append(param)
                     param = None
                 ctx.pop()
-            if tag == "DW_TAG_formal_parameter" and subprogram:
+            if (
+                tag in {"DW_TAG_formal_parameter", "DW_TAG_variable"}
+                and subprogram
+            ):
                 param = Parameter()
             ctx.append((no, tag))
             continue
@@ -86,7 +94,10 @@ def find_subprogram(  # noqa
         if b"DW_AT_name" in line:
             if ctx[-1][1] == "DW_TAG_subprogram":
                 subprogram_name = line.decode().split()[-1]
-            elif ctx[-1][1] == "DW_TAG_formal_parameter" and param:
+            elif (
+                ctx[-1][1] in {"DW_TAG_formal_parameter", "DW_TAG_variable"}
+                and param
+            ):
                 param.name = line.decode().split()[-1]
             continue
 
@@ -104,7 +115,7 @@ def find_subprogram(  # noqa
 
         if (
             b"DW_AT_type" in line
-            and ctx[-1][1] == "DW_TAG_formal_parameter"
+            and ctx[-1][1] in {"DW_TAG_formal_parameter", "DW_TAG_variable"}
             and param
         ):
             param.type_addr = line.decode().split()[-1].strip("<>")
@@ -112,7 +123,7 @@ def find_subprogram(  # noqa
 
         if (
             b"DW_AT_location" in line
-            and ctx[-1][1] == "DW_TAG_formal_parameter"
+            and ctx[-1][1] in {"DW_TAG_formal_parameter", "DW_TAG_variable"}
             and param
         ):
             param.dw_at_location = PAT_DW_AT_location.search(

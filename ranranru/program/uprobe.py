@@ -37,7 +37,7 @@ class PeekDefine(Define):
     # class var
     pat_expression = re.compile(r"\$peek\((.*)\)")  # $peek($sp(str))
     pat_cooked_reg = re.compile(r"^\$(\w+)")  # $sp
-    pat_cooked_ops = re.compile(r"\+\d+|\*")  # +1**+2+3*
+    pat_cooked_ops = re.compile(r"(?:\+|-)\d+|\*")  # +1**+2-3*
     pat_cast = re.compile(r"\((.*)\)$")
 
     def __post_init__(self):
@@ -67,7 +67,7 @@ class PeekDefine(Define):
             cooked = dwarf_interpreter.find_expr_location(
                 uprobe_addr, parts[0], parts[1:]
             )
-            if cast.startswith('(char'):
+            if cast.startswith("(char"):
                 cooked += "*"
             return self.interpret_cooked(cooked + cast)
 

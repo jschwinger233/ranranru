@@ -68,16 +68,3 @@ def main(
         file=open(output, "w"),
     )
     print(f"generated {output}")
-
-
-if __name__ == "__main__":
-    # main()
-    i = elf.Interpreter(
-        "/home/gray/Dropbox/mac.local/Documents/src/github.com/projecteru2/core/core"
-    )
-    print(
-        i.parse_expr_location(
-            "0x0000000000fd6cee", "kvs", ["array", "Key", "array"]
-        )
-    )
-    # print(i.parse_expr_location("0xfc1260", "opts", []))
