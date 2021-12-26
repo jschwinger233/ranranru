@@ -1,4 +1,9 @@
 # ranranru
-A BCC tool for Golang dynamic tracing.
 
-Under construction...
+Trace Golang with BCC like GDB.
+
+## About ranranru
+
+- [Installation](docs/install.md)
+- [Tutorial](docs/tutorial.md)
+- [Reference](docs/reference.md)

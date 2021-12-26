@@ -29,10 +29,7 @@ def parse_op_reg(desc: str) -> str:
 
 
 def parse_op_fbreg(desc: str, cfa: str) -> str:
-    try:
-        offset = PAT_OP_FBREG.search(desc).group(1)
-    except:
-        import pdb; pdb.set_trace()
+    offset = PAT_OP_FBREG.search(desc).group(1)
     if offset.isdigit():
         offset = f"+{offset}"
     return f"{cfa}{offset}*"
