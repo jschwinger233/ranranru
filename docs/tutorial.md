@@ -42,7 +42,7 @@ Our first mission is to trace the [WalkFunc](https://pkg.go.dev/path/filepath#Wa
 
 We want to log the `path` argument once the program is executing that anonymous function.
 
-Let's start with locate the uprobe via symbol table, and `nm(1)` (or `go tool nm`) will do the job:
+Let's start with locating the uprobe via symbol table, and `nm(1)` (or `go tool nm`) will do the job:
 
 ```bash
 $ go tool nm ./main | grep sumFiles
@@ -82,7 +82,7 @@ generated trace.bcc.py
 
 1. `main.sumFiles.func1.1;` specifies the [uprobe](https://www.brendangregg.com/blog/2015-06-28/linux-ftrace-uprobe.html) address;
 2. `p=$peek(path.str(char16)), pn=$peek(path.len(int64));` defines 2 variables `p` and `pn`, using a builtin function `$peek`.
-3. `{print(p[:pn])};` is a pure Python script wrapped by a pairof curly brace, and we just simply print the pre-defined variables.
+3. `{print(p[:pn])};` is a pure Python script wrapped by a pair of curly brace, and we just simply print the pre-defined variables.
 
 And we're all set! Run the generated `trace.bcc.py`, and here's part of my output:
 
