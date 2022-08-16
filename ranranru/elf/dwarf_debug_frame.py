@@ -2,12 +2,12 @@ from .utils import yield_elf_lines
 
 
 def find_cfa_expr(dwarf_filename: str, low_pc: str, uprobe_addr: str) -> str:
-    low_pc = low_pc.removeprefix('0x').encode()
+    low_pc = low_pc.removeprefix("0x").encode()
     uprobe_addr = int(uprobe_addr, 16)
     start = False
     last_loc = last_cfa = None
-    for line in yield_elf_lines(dwarf_filename, 'WF'):
-        if low_pc in line and b'pc' in line:
+    for line in yield_elf_lines(dwarf_filename, "-dwarf=frames-interp"):
+        if low_pc in line and b"pc" in line:
             start = True
             continue
 
@@ -16,7 +16,7 @@ def find_cfa_expr(dwarf_filename: str, low_pc: str, uprobe_addr: str) -> str:
 
         # all below are within a DIE
 
-        if b'LOC' in line:
+        if b"LOC" in line:
             continue
 
         if not line:
